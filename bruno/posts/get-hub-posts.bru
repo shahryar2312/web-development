@@ -1,0 +1,21 @@
+meta {
+  name: Get Hub Posts
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/hubs/{{hubId}}/posts
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+params:query {
+  page: 1
+  sort: new
+  ~type: text
+}

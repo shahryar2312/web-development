@@ -1,0 +1,28 @@
+meta {
+  name: Create Comment
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/posts/{{postId}}/comments
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "content": "100% agree on the MAD-X especially, that thing is just miserable to play against ngl. fought one last night that sat at 900m the entire match just spamming railgun shots and then when we finally pushed it the thing just. wouldnt. die. like what are you supposed to do with that lol"
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body.success) {
+    bru.setVar("commentId", body.data.comment._id);
+  }
+}

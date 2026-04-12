@@ -1,0 +1,15 @@
+# Design / AI-generated docs
+BACKEND_DESIGN.md
+
+# Dependencies
+node_modules/
+
+# Secrets
+.env
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db

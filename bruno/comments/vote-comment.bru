@@ -1,0 +1,21 @@
+meta {
+  name: Vote Comment
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/comments/{{commentId}}/vote
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "value": 1
+  }
+}

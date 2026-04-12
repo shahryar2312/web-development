@@ -1,0 +1,16 @@
+meta {
+  name: Hub LFG Feed
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/hubs/{{hubId}}/lfg
+  body: none
+  auth: none
+}
+
+params:query {
+  status: open
+  ~platform: PC
+}

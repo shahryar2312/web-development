@@ -1,0 +1,36 @@
+const express = require('express');
+const { body } = require('express-validator');
+
+const { getHubPosts, createPost, getPost, updatePost, deletePost, votePost } = require('../controllers/post.controller');
+const { protect, optionalAuth } = require('../middleware/auth');
+const { voteLimiter } = require('../middleware/rateLimiter');
+
+const createRules = [
+  body('title').trim().isLength({ min: 3, max: 300 }).withMessage('Title must be 3–300 characters'),
+  body('content').optional().isLength({ max: 40000 }),
+  body('type').optional().isIn(['text', 'image', 'link', 'lfg']).withMessage('Invalid post type'),
+  body('url').optional({ checkFalsy: true }).isURL().withMessage('URL must be a valid URL'),
+  body('tags').optional().isArray({ max: 5 }).withMessage('Maximum 5 tags allowed'),
+  body('flair').optional().isLength({ max: 50 }),
+];
+
+const updateRules = [
+  body('title').optional().trim().isLength({ min: 3, max: 300 }),
+  body('content').optional().isLength({ max: 40000 }),
+  body('tags').optional().isArray({ max: 5 }),
+  body('flair').optional().isLength({ max: 50 }),
+];
+
+// Mounted at /api/hubs/:hubId/posts — mergeParams carries :hubId down
+const hubPostsRouter = express.Router({ mergeParams: true });
+hubPostsRouter.get('/',  optionalAuth, getHubPosts);
+hubPostsRouter.post('/', protect,      createRules, createPost);
+
+// Mounted at /api/posts
+const postRouter = express.Router();
+postRouter.get('/:postId',       optionalAuth,            getPost);
+postRouter.put('/:postId',       protect,    updateRules, updatePost);
+postRouter.delete('/:postId',    protect,                 deletePost);
+postRouter.post('/:postId/vote', protect,    voteLimiter, votePost);
+
+module.exports = { hubPostsRouter, postRouter };

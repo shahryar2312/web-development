@@ -1,0 +1,21 @@
+meta {
+  name: Update LFG Status
+  type: http
+  seq: 3
+}
+
+patch {
+  url: {{baseUrl}}/api/lfg/{{postId}}/status
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "status": "closed"
+  }
+}
