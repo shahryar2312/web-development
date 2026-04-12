@@ -7,6 +7,7 @@ const {
   joinHub, leaveHub, getHubMembers,
 } = require('../controllers/hub.controller');
 const { protect } = require('../middleware/auth');
+const validateRequest = require('../middleware/validateRequest');
 
 const createRules = [
   body('name')
@@ -33,9 +34,9 @@ const updateRules = [
 ];
 
 router.get('/',                  getHubs);
-router.post('/',                 protect, createRules, createHub);
+router.post('/',                 protect, createRules, validateRequest, createHub);
 router.get('/:hubId',            getHub);
-router.put('/:hubId',            protect, updateRules, updateHub);
+router.put('/:hubId',            protect, updateRules, validateRequest, updateHub);
 router.delete('/:hubId',         protect,              deleteHub);
 router.post('/:hubId/join',      protect,              joinHub);
 router.delete('/:hubId/join',    protect,              leaveHub);

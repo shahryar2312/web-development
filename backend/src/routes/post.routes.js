@@ -4,6 +4,9 @@ const { body } = require('express-validator');
 const { getHubPosts, createPost, getPost, updatePost, deletePost, votePost } = require('../controllers/post.controller');
 const { protect, optionalAuth } = require('../middleware/auth');
 const { voteLimiter } = require('../middleware/rateLimiter');
+const validateRequest = require('../middleware/validateRequest');
+const upload = require('../middleware/uploadUtility');
+const xssSanitizer = require('../middleware/xssSanitizer');
 
 const createRules = [
   body('title').trim().isLength({ min: 3, max: 300 }).withMessage('Title must be 3–300 characters'),
@@ -24,12 +27,12 @@ const updateRules = [
 // Mounted at /api/hubs/:hubId/posts — mergeParams carries :hubId down
 const hubPostsRouter = express.Router({ mergeParams: true });
 hubPostsRouter.get('/',  optionalAuth, getHubPosts);
-hubPostsRouter.post('/', protect,      createRules, createPost);
+hubPostsRouter.post('/', protect,      upload.single('image'), xssSanitizer, createRules, validateRequest, createPost);
 
 // Mounted at /api/posts
 const postRouter = express.Router();
 postRouter.get('/:postId',       optionalAuth,            getPost);
-postRouter.put('/:postId',       protect,    updateRules, updatePost);
+postRouter.put('/:postId',       protect,    xssSanitizer, updateRules, validateRequest, updatePost);
 postRouter.delete('/:postId',    protect,                 deletePost);
 postRouter.post('/:postId/vote', protect,    voteLimiter, votePost);
 

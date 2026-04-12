@@ -7,6 +7,8 @@ const hubRoutes                        = require('./hub.routes');
 const { hubPostsRouter, postRouter }   = require('./post.routes');
 const { postCommentsRouter, commentRouter } = require('./comment.routes');
 const { lfgRouter, lfgHubRouter }      = require('./lfg.routes');
+const searchRoutes                    = require('./search.routes');
+const notificationRoutes              = require('./notification.routes');
 
 // Auth
 router.use('/auth',   authRoutes);
@@ -32,5 +34,11 @@ router.use('/comments', commentRouter);             // PUT, DELETE, VOTE
 
 // Global LFG feed + LFG status update
 router.use('/lfg', lfgRouter);
+
+// Global Search
+router.use('/search', searchRoutes);
+
+// Notifications
+router.use('/notifications', notificationRoutes);
 
 module.exports = router;

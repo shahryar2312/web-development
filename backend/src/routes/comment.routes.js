@@ -4,6 +4,8 @@ const { body } = require('express-validator');
 const { getComments, createComment, updateComment, deleteComment, voteComment } = require('../controllers/comment.controller');
 const { protect, optionalAuth } = require('../middleware/auth');
 const { voteLimiter } = require('../middleware/rateLimiter');
+const validateRequest = require('../middleware/validateRequest');
+const xssSanitizer = require('../middleware/xssSanitizer');
 
 const createRules = [
   body('content')
@@ -24,11 +26,11 @@ const updateRules = [
 // Mounted at /api/posts/:postId/comments — mergeParams carries :postId down
 const postCommentsRouter = express.Router({ mergeParams: true });
 postCommentsRouter.get('/',  optionalAuth,           getComments);
-postCommentsRouter.post('/', protect, createRules,   createComment);
+postCommentsRouter.post('/', protect, xssSanitizer, createRules, validateRequest, createComment);
 
 // Mounted at /api/comments
 const commentRouter = express.Router();
-commentRouter.put('/:commentId',       protect, updateRules, updateComment);
+commentRouter.put('/:commentId',       protect, xssSanitizer, updateRules, validateRequest, updateComment);
 commentRouter.delete('/:commentId',    protect,              deleteComment);
 commentRouter.post('/:commentId/vote', protect, voteLimiter, voteComment);
 

@@ -62,6 +62,9 @@ hubSchema.pre('save', function (next) {
   next();
 });
 
+// Compound indexes
+hubSchema.index({ name: 'text', game: 'text' });
+
 hubSchema.methods.toJSON = function () {
   const obj = this.toObject();
   delete obj.__v;

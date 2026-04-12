@@ -7,6 +7,13 @@ const lfgDetailsSchema = new mongoose.Schema(
       type: String,
       enum: ['PC', 'PlayStation', 'Xbox', 'Nintendo Switch', 'Mobile', 'Cross-platform'],
     },
+    region: {
+      type: String,
+      enum: ['NA', 'EU', 'Asia', 'OCE', 'SA', 'Global'],
+      default: 'Global',
+    },
+    voiceChat: { type: Boolean, default: false },
+    gameMode: { type: String, maxlength: 100, default: '' },
     skillLevel: {
       type: String,
       enum: ['Beginner', 'Intermediate', 'Advanced', 'Expert', 'Any'],
@@ -76,6 +83,7 @@ postSchema.index({ hub: 1, createdAt: -1 });   // hub feed sorted by new
 postSchema.index({ hub: 1, voteScore: -1 });   // hub feed sorted by hot/top
 postSchema.index({ author: 1, createdAt: -1 }); // user profile post list
 postSchema.index({ type: 1, hub: 1 });          // LFG filter by hub
+postSchema.index({ title: 'text', content: 'text' }, { weights: { title: 10, content: 5 } });
 
 postSchema.methods.toJSON = function () {
   const obj = this.toObject();

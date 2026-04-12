@@ -1,4 +1,8 @@
 require('dotenv').config();
+const validateEnv = require('./src/config/envValidator');
+
+// Fail-fast if environment is misconfigured
+validateEnv();
 
 const express = require('express');
 const cors = require('cors');

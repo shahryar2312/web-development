@@ -41,8 +41,11 @@ const userSchema = new mongoose.Schema(
       default: 'user',
     },
     joinedHubs: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Hub' }],
+    favoriteGames: [{ type: String, maxlength: 50 }],
     // Stored so we can invalidate it on logout (server-side session revocation)
     refreshToken: { type: String, select: false },
+    resetPasswordToken: String,
+    resetPasswordExpire: Date,
   },
   { timestamps: true }
 );
@@ -54,6 +57,9 @@ userSchema.pre('save', async function (next) {
   this.password = await bcrypt.hash(this.password, salt);
   next();
 });
+
+// Stripping fields/indexes
+userSchema.index({ username: 'text' });
 
 userSchema.methods.comparePassword = async function (candidatePassword) {
   return bcrypt.compare(candidatePassword, this.password);
