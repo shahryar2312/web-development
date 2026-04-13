@@ -2,7 +2,6 @@ const crypto = require('crypto');
 const User = require('../models/User');
 const AuthService = require('../services/AuthService');
 const sendEmail = require('../utils/emailService');
-const { REFRESH_COOKIE_OPTIONS } = require('../utils/jwtUtils');
 const { success, error } = require('../utils/apiResponse');
 const asyncHandler = require('../utils/asyncHandler');
 
@@ -14,15 +13,16 @@ const asyncHandler = require('../utils/asyncHandler');
 const register = asyncHandler(async (req, res) => {
   const { username, email, password } = req.body;
   
-  // Check if user already exists (handled by Mongoose unique but good to catch early)
+  // Check if user already exists
   const existing = await User.findOne({ $or: [{ email }, { username }] });
   if (existing) return error(res, 'Username or email already exists.', 409);
 
   const user = await User.create({ username, email, password });
-  const { accessToken, refreshToken } = await AuthService.issueTokens(user);
 
-  res.cookie('refreshToken', refreshToken, REFRESH_COOKIE_OPTIONS);
-  return success(res, { user, accessToken }, 201);
+  // Create session
+  req.session.userId = user._id;
+
+  return success(res, { user }, 201);
 });
 
 /**
@@ -33,15 +33,15 @@ const register = asyncHandler(async (req, res) => {
 const login = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
 
-  const user = await User.findOne({ email }).select('+password +refreshToken');
+  const user = await User.findOne({ email }).select('+password');
   if (!user || !(await user.comparePassword(password))) {
     return error(res, 'Invalid email or password.', 401);
   }
 
-  const { accessToken, refreshToken } = await AuthService.issueTokens(user);
+  // Create session
+  req.session.userId = user._id;
 
-  res.cookie('refreshToken', refreshToken, REFRESH_COOKIE_OPTIONS);
-  return success(res, { user: user.toJSON(), accessToken });
+  return success(res, { user: user.toJSON() });
 });
 
 /**
@@ -50,27 +50,11 @@ const login = asyncHandler(async (req, res) => {
  * @access  Public
  */
 const logout = asyncHandler(async (req, res) => {
-  const { refreshToken } = req.cookies;
-  if (refreshToken) {
-    await User.findOneAndUpdate({ refreshToken }, { $unset: { refreshToken: 1 } });
-  }
-  res.clearCookie('refreshToken');
-  return success(res, { message: 'Logged out successfully.' });
-});
-
-/**
- * @desc    Issue a fresh access token using the refresh-token cookie
- * @route   POST /api/auth/refresh
- * @access  Public
- */
-const refresh = asyncHandler(async (req, res) => {
-  const { refreshToken: oldRefreshToken } = req.cookies;
-  if (!oldRefreshToken) return error(res, 'No refresh token.', 401);
-
-  const { accessToken, refreshToken } = await AuthService.rotateTokens(oldRefreshToken);
-
-  res.cookie('refreshToken', refreshToken, REFRESH_COOKIE_OPTIONS);
-  return success(res, { accessToken });
+  req.session.destroy((err) => {
+    if (err) return error(res, 'Logout failed.', 500);
+    res.clearCookie('connect.sid');
+    return success(res, { message: 'Logged out successfully.' });
+  });
 });
 
 /**
@@ -138,11 +122,10 @@ const resetPassword = asyncHandler(async (req, res) => {
   user.resetPasswordExpire = undefined;
   await user.save();
 
-  // Issue new tokens (log them in)
-  const { accessToken, refreshToken } = await AuthService.issueTokens(user);
+  // Create session (log them in)
+  req.session.userId = user._id;
 
-  res.cookie('refreshToken', refreshToken, REFRESH_COOKIE_OPTIONS);
-  return success(res, { user, accessToken });
+  return success(res, { user });
 });
 
-module.exports = { register, login, logout, refresh, getMe, forgotPassword, resetPassword };
+module.exports = { register, login, logout, getMe, forgotPassword, resetPassword };

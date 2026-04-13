@@ -1,50 +1,45 @@
-const { verifyAccessToken } = require('../utils/jwtUtils');
 const { error } = require('../utils/apiResponse');
 const User = require('../models/User');
 
 /**
- * Require a valid Bearer access token.
- * Verifies the token, loads the user from the DB, and attaches them to req.user.
- * Returns 401 if the token is missing, invalid, or expired.
+ * Require a valid session.
+ * Checks if userId is in the session, loads the user from the DB, and attaches them to req.user.
+ * Returns 401 if the session is missing or user is not found.
  * @type {import('express').RequestHandler}
  */
 const protect = async (req, res, next) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith('Bearer ')) {
-      return error(res, 'Access denied. No token provided.', 401);
+    if (!req.session || !req.session.userId) {
+      return error(res, 'Access denied. Please log in.', 401);
     }
 
-    const token = authHeader.split(' ')[1];
-    const decoded = verifyAccessToken(token);
-
-    const user = await User.findById(decoded.id);
-    if (!user) return error(res, 'User not found.', 401);
+    const user = await User.findById(req.session.userId);
+    if (!user) {
+      // Session exists but user doesn't; clear it.
+      req.session.destroy();
+      return error(res, 'User not found.', 401);
+    }
 
     req.user = user;
     next();
   } catch (err) {
-    if (err.name === 'TokenExpiredError') return error(res, 'Token expired.', 401);
-    return error(res, 'Invalid token.', 401);
+    return error(res, 'Authentication failed.', 401);
   }
 };
 
 /**
  * Like protect, but never blocks the request.
- * Silently attaches req.user if a valid token is present; continues as a guest otherwise.
- * Use on public endpoints that return extra data for logged-in users (e.g. vote state).
+ * Silently attaches req.user if a valid session is present; continues as a guest otherwise.
  * @type {import('express').RequestHandler}
  */
 const optionalAuth = async (req, res, next) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith('Bearer ')) return next();
-    const token = authHeader.split(' ')[1];
-    const decoded = verifyAccessToken(token);
-    const user = await User.findById(decoded.id);
-    if (user) req.user = user;
+    if (req.session?.userId) {
+      const user = await User.findById(req.session.userId);
+      if (user) req.user = user;
+    }
   } catch {
-    // Silently ignore — the request continues unauthenticated
+    // Silently ignore
   }
   next();
 };

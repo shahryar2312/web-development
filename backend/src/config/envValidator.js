@@ -5,8 +5,7 @@
 const validateEnv = () => {
   const required = [
     'MONGO_URI',
-    'JWT_ACCESS_SECRET',
-    'JWT_REFRESH_SECRET',
+    'SESSION_SECRET',
   ];
 
   const missing = required.filter((key) => !process.env[key]);
@@ -19,14 +18,8 @@ const validateEnv = () => {
 
   // Ensure secrets aren't using placeholders in production
   if (process.env.NODE_ENV === 'production') {
-    const placeholders = ['change_this_access_secret', 'change_this_refresh_secret'];
-    const usedPlaceholders = [
-      process.env.JWT_ACCESS_SECRET,
-      process.env.JWT_REFRESH_SECRET,
-    ].filter((val) => placeholders.includes(val));
-
-    if (usedPlaceholders.length > 0) {
-      console.warn('WARNING: Using placeholder values for JWT secrets in production!');
+    if (process.env.SESSION_SECRET === 'change_this_session_secret') {
+      console.warn('WARNING: Using placeholder value for SESSION_SECRET in production!');
     }
   }
 };

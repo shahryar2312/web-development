@@ -31,11 +31,6 @@
       "type": "string"
     },
     {
-      "key": "accessToken",
-      "value": "",
-      "type": "string"
-    },
-    {
       "key": "testEmail",
       "value": "{{$randomEmail}}",
       "type": "string"
@@ -62,14 +57,7 @@
     }
   ],
   "auth": {
-    "type": "bearer",
-    "bearer": [
-      {
-        "key": "token",
-        "value": "{{accessToken}}",
-        "type": "string"
-      }
-    ]
+    "type": "noauth"
   },
   "item": [
     {
@@ -123,7 +111,6 @@
                   "if(pm.response.code === 201 || pm.response.code === 200) {",
                   "    const data = pm.response.json().data;",
                   "    if(data && data.user) pm.collectionVariables.set('userId', data.user._id);",
-                  "    if(data && data.accessToken) pm.collectionVariables.set('accessToken', data.accessToken);",
                   "}"
                 ]
               }
@@ -168,39 +155,6 @@
                   "if(pm.response.code === 200) {",
                   "    const data = pm.response.json().data;",
                   "    if(data && data.user) pm.collectionVariables.set('userId', data.user._id);",
-                  "    if(data && data.accessToken) pm.collectionVariables.set('accessToken', data.accessToken);",
-                  "}"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Refresh Token",
-          "request": {
-            "method": "POST",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/api/auth/refresh",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "auth",
-                "refresh"
-              ]
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "if(pm.response.code === 200) {",
-                  "    const data = pm.response.json().data;",
-                  "    if(data && data.accessToken) pm.collectionVariables.set('accessToken', data.accessToken);",
                   "}"
                 ]
               }

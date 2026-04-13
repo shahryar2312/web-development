@@ -42,8 +42,6 @@ const userSchema = new mongoose.Schema(
     },
     joinedHubs: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Hub' }],
     favoriteGames: [{ type: String, maxlength: 50 }],
-    // Stored so we can invalidate it on logout (server-side session revocation)
-    refreshToken: { type: String, select: false },
     resetPasswordToken: String,
     resetPasswordExpire: Date,
   },
@@ -69,7 +67,6 @@ userSchema.methods.comparePassword = async function (candidatePassword) {
 userSchema.methods.toJSON = function () {
   const obj = this.toObject();
   delete obj.password;
-  delete obj.refreshToken;
   delete obj.__v;
   return obj;
 };

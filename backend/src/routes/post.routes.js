@@ -1,5 +1,5 @@
 const express = require('express');
-const { body } = require('express-validator');
+const { body, param } = require('express-validator');
 
 const { getHubPosts, createPost, getPost, updatePost, deletePost, votePost } = require('../controllers/post.controller');
 const { protect, optionalAuth } = require('../middleware/auth');
@@ -24,10 +24,13 @@ const updateRules = [
   body('flair').optional().isLength({ max: 50 }),
 ];
 
+const validateHubId = [param('hubId').isMongoId().withMessage('Invalid Hub ID format')];
+const validatePostId = [param('postId').isMongoId().withMessage('Invalid Post ID format')];
+
 // Mounted at /api/hubs/:hubId/posts — mergeParams carries :hubId down
 const hubPostsRouter = express.Router({ mergeParams: true });
-hubPostsRouter.get('/',  optionalAuth, getHubPosts);
-hubPostsRouter.post('/', protect,      upload.single('image'), xssSanitizer, createRules, validateRequest, createPost);
+hubPostsRouter.get('/',  optionalAuth, validateHubId, validateRequest, getHubPosts);
+hubPostsRouter.post('/', protect, validateHubId, validateRequest, upload.single('image'), xssSanitizer, createRules, validateRequest, createPost);
 
 // Mounted at /api/posts
 const postRouter = express.Router();
