@@ -7,11 +7,10 @@ meta {
 post {
   url: {{baseUrl}}/api/auth/logout
   body: none
-  auth: none
 }
 
 script:post-response {
   if (res.getBody().success) {
-    bru.setVar("accessToken", "");
+    bru.setVar("userId", "");
   }
 }

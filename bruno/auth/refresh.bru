@@ -1,18 +1,16 @@
 meta {
-  name: Refresh Token
+  name: Forgot Password
   type: http
   seq: 5
 }
 
 post {
-  url: {{baseUrl}}/api/auth/refresh
-  body: none
-  auth: none
+  url: {{baseUrl}}/api/auth/forgotpassword
+  body: json
 }
 
-script:post-response {
-  const body = res.getBody();
-  if (body.success) {
-    bru.setVar("accessToken", body.data.accessToken);
+body:json {
+  {
+    "email": "IliaKlodin446688@boohoo.com"
   }
 }

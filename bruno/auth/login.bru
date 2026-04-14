@@ -7,12 +7,11 @@ meta {
 post {
   url: {{baseUrl}}/api/auth/login
   body: json
-  auth: none
 }
 
 body:json {
   {
-    "email": "testuser@example.com",
+    "email": "IliaKlodin446688@boohoo.com",
     "password": "Test1234!"
   }
 }
@@ -20,6 +19,6 @@ body:json {
 script:post-response {
   const body = res.getBody();
   if (body.success) {
-    bru.setVar("accessToken", body.data.accessToken);
+    bru.setVar("userId", body.data.user._id);
   }
 }

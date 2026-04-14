@@ -5,13 +5,8 @@ meta {
 }
 
 patch {
-  url: {{baseUrl}}/api/lfg/{{postId}}/status
+  url: {{baseUrl}}/api/lfg/{{lfgPostId}}/status
   body: json
-  auth: bearer
-}
-
-auth:bearer {
-  token: {{accessToken}}
 }
 
 body:json {

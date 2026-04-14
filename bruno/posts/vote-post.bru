@@ -7,11 +7,6 @@ meta {
 post {
   url: {{baseUrl}}/api/posts/{{postId}}/vote
   body: json
-  auth: bearer
-}
-
-auth:bearer {
-  token: {{accessToken}}
 }
 
 body:json {

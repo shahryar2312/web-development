@@ -12,17 +12,20 @@ const asyncHandler = require('../utils/asyncHandler');
  */
 const register = asyncHandler(async (req, res) => {
   const { username, email, password } = req.body;
-  
+
   // Check if user already exists
   const existing = await User.findOne({ $or: [{ email }, { username }] });
   if (existing) return error(res, 'Username or email already exists.', 409);
 
   const user = await User.create({ username, email, password });
 
-  // Create session
-  req.session.userId = user._id;
-
-  return success(res, { user }, 201);
+  // Ilia Klodin 14.04 - regenerate session before setting userId, same fixation fix as login.
+  // new account shouldn't inherit whatever session ID the visitor had before registering
+  req.session.regenerate((err) => {
+    if (err) return error(res, 'Registration failed.', 500);
+    req.session.userId = user._id;
+    return success(res, { user }, 201);
+  });
 });
 
 /**
@@ -38,10 +41,14 @@ const login = asyncHandler(async (req, res) => {
     return error(res, 'Invalid email or password.', 401);
   }
 
-  // Create session
-  req.session.userId = user._id;
-
-  return success(res, { user: user.toJSON() });
+  // Ilia Klodin 14.04 - regenerate the session before assigning userId so the old session ID
+  // (which an attacker could've planted in the user's browser before they logged in) gets
+  // destroyed and replaced with a fresh one - prevents sesion fixation attack
+  req.session.regenerate((err) => {
+    if (err) return error(res, 'Login failed.', 500);
+    req.session.userId = user._id;
+    return success(res, { user: user.toJSON() });
+  });
 });
 
 /**
@@ -65,7 +72,7 @@ const logout = asyncHandler(async (req, res) => {
 const getMe = (req, res) => success(res, { user: req.user });
 
 /**
- * @desc    Forgot password — sends a reset token to the user's email
+ * @desc    Forgot password - sends a reset token to the user's email
  * @route   POST /api/auth/forgotpassword
  * @access  Public
  */
@@ -122,10 +129,13 @@ const resetPassword = asyncHandler(async (req, res) => {
   user.resetPasswordExpire = undefined;
   await user.save();
 
-  // Create session (log them in)
-  req.session.userId = user._id;
-
-  return success(res, { user });
+  // Ilia Klodin 14.04 - regenerate here aswell, password reset logs the user in
+  // so it needs the same session fixation fix as login
+  req.session.regenerate((err) => {
+    if (err) return error(res, 'Login failed.', 500);
+    req.session.userId = user._id;
+    return success(res, { user });
+  });
 });
 
 module.exports = { register, login, logout, getMe, forgotPassword, resetPassword };

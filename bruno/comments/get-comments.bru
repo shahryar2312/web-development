@@ -7,11 +7,6 @@ meta {
 get {
   url: {{baseUrl}}/api/posts/{{postId}}/comments
   body: none
-  auth: bearer
-}
-
-auth:bearer {
-  token: {{accessToken}}
 }
 
 params:query {
