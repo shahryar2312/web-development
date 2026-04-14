@@ -162,37 +162,6 @@
           ]
         },
         {
-          "name": "Logout",
-          "request": {
-            "method": "POST",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/api/auth/logout",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "auth",
-                "logout"
-              ]
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Executed without server crash', function () {",
-                  "    pm.expect(pm.response.code).to.be.below(500);",
-                  "});"
-                ]
-              }
-            }
-          ]
-        },
-        {
           "name": "Get Me",
           "request": {
             "method": "GET",
@@ -615,7 +584,7 @@
           ]
         },
         {
-          "name": "Create Post (Text)",
+          "name": "Create Post (Image)",
           "request": {
             "method": "POST",
             "header": [],
@@ -646,8 +615,13 @@
                 },
                 {
                   "key": "type",
-                  "value": "text",
+                  "value": "image",
                   "type": "text"
+                },
+                {
+                  "key": "image",
+                  "type": "file",
+                  "src": "test-image.jpg"
                 }
               ]
             }
@@ -1307,6 +1281,42 @@
                 "users",
                 "{{testUsername}}",
                 "comments"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Executed without server crash', function () {",
+                  "    pm.expect(pm.response.code).to.be.below(500);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Cleanup",
+      "item": [
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "logout"
               ]
             }
           },

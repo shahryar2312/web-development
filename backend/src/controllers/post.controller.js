@@ -57,12 +57,13 @@ const createPost = asyncHandler(async (req, res) => {
   if (!hub) return error(res, 'Hub not found.', 404);
 
   const { title, content, type, url, tags, flair, lfgDetails } = req.body;
-
+  const resolvedUrl = req.file ? req.file.path : (url || '');
+  console.log('[Create Post] req.body.url:', url, '| req.file:', req.file, '| Final URL:', resolvedUrl);
   const postData = {
     title,
     content,
     type: type || 'text',
-    url: req.file ? req.file.path : (url || ''),
+    url: resolvedUrl,
     tags: tags || [],
     flair: flair || '',
     author: req.user._id,
