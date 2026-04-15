@@ -1,0 +1,16 @@
+meta {
+  name: Get Hub Posts
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/hubs/{{hubId}}/posts
+  body: none
+}
+
+params:query {
+  page: 1
+  sort: new
+  ~type: text
+}

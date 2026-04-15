@@ -1,0 +1,20 @@
+meta {
+  name: Update Hub
+  type: http
+  seq: 5
+}
+
+put {
+  url: {{baseUrl}}/api/hubs/{{hubId}}
+  body: json
+}
+
+body:json {
+  {
+    "description": "the #1 MWO hub on GamerHub. builds, meta, lfg, and complaining about PGI's monetization decisions",
+    "rules": [
+      { "title": "Be Respectful", "description": "no harassment, no slurs. disagree with the build not the person." },
+      { "title": "No Spam", "description": "dont just drop referral links or promo stuff without context, mods will remove it." }
+    ]
+  }
+}

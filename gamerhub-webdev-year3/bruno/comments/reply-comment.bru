@@ -1,0 +1,17 @@
+meta {
+  name: Reply to Comment
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/posts/{{postId}}/comments
+  body: json
+}
+
+body:json {
+  {
+    "content": "yeah the 900m poke thing is exactly the problem, and people will say 'just counter snipe it' but like... with what lol. nothing in the same price bracket trades that well at range AND still has the zombie thing going for it when you finally close the gap. its just a terrible matchup for basically everything that isnt also an SR-X or another MAD-X. kinda feels like they just dont care at this point tbh",
+    "parentId": "{{commentId}}"
+  }
+}

@@ -1,0 +1,26 @@
+meta {
+  name: Create Hub
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/hubs
+  body: json
+}
+
+body:json {
+  {
+    "name": "MechWarrior Online HQ",
+    "game": "MechWarrior Online",
+    "description": "main hub for everything MWO. builds, meta discussion, rants about PGI, LFG, you name it. all skill levels welcome just dont be a dick",
+    "isPrivate": false
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body.success) {
+    bru.setVar("hubId", body.data.hub._id);
+  }
+}
