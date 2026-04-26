@@ -1,0 +1,10 @@
+meta {
+  name: Add Moderator
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/api/hubs/{{hubId}}/moderators/{{targetUserId}}
+  body: none
+}

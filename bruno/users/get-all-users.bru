@@ -1,0 +1,22 @@
+meta {
+  name: Get All Users
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/users
+  body: none
+}
+
+params:query {
+  page: 1
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body.success && body.data.users.length > 0) {
+    const other = body.data.users.find(u => u._id !== bru.getVar("userId"));
+    if (other) bru.setVar("targetUserId", other._id);
+  }
+}

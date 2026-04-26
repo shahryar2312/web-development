@@ -1,0 +1,17 @@
+meta {
+  name: Get Notifications
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/notifications
+  body: none
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body.success && body.data.notifications.length > 0) {
+    bru.setVar("notificationId", body.data.notifications[0]._id);
+  }
+}

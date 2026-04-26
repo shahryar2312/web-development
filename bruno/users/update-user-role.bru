@@ -1,0 +1,16 @@
+meta {
+  name: Update User Role
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{baseUrl}}/api/users/{{targetUserId}}/role
+  body: json
+}
+
+body:json {
+  {
+    "role": "admin"
+  }
+}

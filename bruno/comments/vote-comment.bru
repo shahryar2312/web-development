@@ -1,0 +1,16 @@
+meta {
+  name: Vote Comment
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/comments/{{commentId}}/vote
+  body: json
+}
+
+body:json {
+  {
+    "value": 1
+  }
+}

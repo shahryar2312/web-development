@@ -1,0 +1,10 @@
+meta {
+  name: Hub Unban User
+  type: http
+  seq: 9
+}
+
+delete {
+  url: {{baseUrl}}/api/hubs/{{hubId}}/ban/{{targetUserId}}
+  body: none
+}

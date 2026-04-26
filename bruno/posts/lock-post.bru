@@ -1,0 +1,16 @@
+meta {
+  name: Lock Post
+  type: http
+  seq: 5
+}
+
+patch {
+  url: {{baseUrl}}/api/posts/{{postId}}/lock
+  body: json
+}
+
+body:json {
+  {
+    "isLocked": true
+  }
+}

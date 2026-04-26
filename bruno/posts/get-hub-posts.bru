@@ -1,0 +1,23 @@
+meta {
+  name: Get Hub Posts
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/hubs/{{hubId}}/posts
+  body: none
+}
+
+params:query {
+  page: 1
+  sort: new
+  ~type: text
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body.success && body.data.posts.length > 0) {
+    bru.setVar("postId", body.data.posts[0]._id);
+  }
+}
