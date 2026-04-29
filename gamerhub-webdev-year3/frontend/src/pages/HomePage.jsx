@@ -14,7 +14,7 @@
  * Mock data is used so the page is fully interactive without a running backend.
  */
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import PostCard from '../components/PostCard';
 import HubCard from '../components/HubCard';
@@ -112,16 +112,29 @@ const MOCK_POSTS = [
 
 function HomePage() {
   const { isLoggedIn } = useAuth();
+  const [searchParams] = useSearchParams();
+  const searchQuery = searchParams.get('search')?.toLowerCase() || '';
 
   // Sort mode: 'hot' | 'new' | 'top'
   const [sort, setSort] = useState('hot');
 
+  // Filter posts based on search query
+  const filteredPosts = MOCK_POSTS.filter((post) => {
+    if (!searchQuery) return true;
+    return (
+      post.title.toLowerCase().includes(searchQuery) ||
+      post.content.toLowerCase().includes(searchQuery) ||
+      post.hub.name.toLowerCase().includes(searchQuery) ||
+      post.author.username.toLowerCase().includes(searchQuery)
+    );
+  });
+
   /**
-   * sortedPosts — Returns the mock post list sorted by the active mode.
+   * sortedPosts — Returns the filtered mock post list sorted by the active mode.
    * In full integration this would be a query param on the API request:
-   *   GET /api/hubs/:hubId/posts?sort=hot&page=1
+   *   GET /api/hubs/:hubId/posts?sort=hot&page=1&q=searchQuery
    */
-  const sortedPosts = [...MOCK_POSTS].sort((a, b) => {
+  const sortedPosts = [...filteredPosts].sort((a, b) => {
     if (sort === 'new') return new Date(b.createdAt) - new Date(a.createdAt);
     if (sort === 'top') return b.voteScore - a.voteScore;
     // 'hot' — balance recency and votes
@@ -160,6 +173,13 @@ function HomePage() {
         {/* ===== Feed column ===== */}
         <section aria-label="Post feed">
 
+          {/* Search Header */}
+          {searchQuery && (
+            <div className="search-header" style={{ marginBottom: '1rem' }}>
+              <h2>Search results for "{searchParams.get('search')}"</h2>
+            </div>
+          )}
+
           {/* Sort controls */}
           <div className="feed-controls">
             <span className="feed-controls__label">Sort by:</span>
@@ -179,8 +199,17 @@ function HomePage() {
           <div className="feed">
             {sortedPosts.length === 0 ? (
               <div className="empty-state">
-                <h3>No posts yet</h3>
-                <p>Be the first to post in this feed!</p>
+                {searchQuery ? (
+                  <>
+                    <h3>No results found</h3>
+                    <p>We couldn't find any posts matching "{searchParams.get('search')}".</p>
+                  </>
+                ) : (
+                  <>
+                    <h3>No posts yet</h3>
+                    <p>Be the first to post in this feed!</p>
+                  </>
+                )}
               </div>
             ) : (
               sortedPosts.map((post) => (
