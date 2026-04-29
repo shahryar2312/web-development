@@ -72,6 +72,30 @@ const MOCK_HUBS = {
       { title: 'Be helpful', description: 'New Tarnished are welcome — no gatekeeping.' },
     ],
   },
+  csgo2: {
+    _id: 'h5',
+    name: 'CSGO2',
+    slug: 'csgo2',
+    game: 'Counter-Strike 2',
+    description: 'Strategy, clips, and team-find for CS2 players.',
+    memberCount: 54300,
+    icon: '',
+    banner: '',
+    isPrivate: false,
+    rules: [{ title: 'No toxicity', description: 'Be respectful.' }],
+  },
+  fifa25: {
+    _id: 'h3',
+    name: 'FIFA25',
+    slug: 'fifa25',
+    game: 'EA Sports FC 25',
+    description: 'Ultimate Team squads, trade tips, and match clips.',
+    memberCount: 32100,
+    icon: '',
+    banner: '',
+    isPrivate: false,
+    rules: [{ title: 'No coin selling', description: 'Bans will be handed out.' }],
+  },
 };
 
 const MOCK_POSTS_BY_SLUG = {
@@ -85,6 +109,14 @@ const MOCK_POSTS_BY_SLUG = {
   ],
   'elden-ring': [
     { _id: 'ep1', title: '[SPOILER] Ending lore breakdown — all 6 endings explained', content: 'After 3 playthroughs I finally understand the Elden Ring lore.', type: 'text', voteScore: 5210, commentCount: 302, tags: ['lore', 'spoiler'], isPinned: false, isLocked: false, author: { username: 'TarnishedLore' }, hub: { name: 'Elden Ring', slug: 'elden-ring' }, createdAt: new Date(Date.now() - 5 * 86400 * 1000).toISOString() },
+    { _id: 'p1', title: 'My first Platinum in Elden Ring after 200 hours — worth every second!', content: 'Finally did it.', type: 'text', voteScore: 4821, commentCount: 312, tags: ['achievement'], isPinned: false, isLocked: false, author: { username: 'tarnished_one' }, hub: { name: 'Elden Ring', slug: 'elden-ring' }, createdAt: new Date(Date.now() - 2 * 3600 * 1000).toISOString() },
+  ],
+  csgo2: [
+    { _id: 'p4', title: 'CS2 Major predictions thread — who wins the Grand Final?', content: 'FaZe vs NaVi Grand Final confirmed. Place your bets and reasoning below.', type: 'text', voteScore: 731, commentCount: 198, tags: ['major', 'esports', 'prediction'], isPinned: false, isLocked: false, author: { username: 'awpGod_official' }, hub: { name: 'CSGO2', slug: 'csgo2' }, createdAt: new Date(Date.now() - 12 * 3600 * 1000).toISOString() },
+    { _id: 'lfg3', title: '[CS2] NA Faceit Level 8+ looking for team', content: 'LFM for a serious Faceit team.', type: 'lfg', voteScore: 88, commentCount: 1, tags: ['lfg'], isPinned: false, isLocked: false, author: { username: 'awpGod_official' }, hub: { name: 'CSGO2', slug: 'csgo2' }, createdAt: new Date(Date.now() - 6 * 3600 * 1000).toISOString() },
+  ],
+  fifa25: [
+    { _id: 'p5', title: 'Rate my Ultimate Team — 500k budget FIFA 25', content: 'Built around Mbappe and Rodri in the midfield.', type: 'link', voteScore: 214, commentCount: 41, tags: ['FUT'], isPinned: false, isLocked: false, author: { username: 'GoalMachine_88' }, hub: { name: 'FIFA25', slug: 'fifa25' }, createdAt: new Date(Date.now() - 24 * 3600 * 1000).toISOString() },
   ],
 };
 

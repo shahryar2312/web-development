@@ -66,6 +66,11 @@ const MOCK_USERS = {
     postCount:  112,
     commentCount: 489,
   },
+  spikeDefuser99: { _id: 'u3', username: 'spikeDefuser99', email: 'spike@example.com', bio: 'Jett/Reyna main. 500+ hours.', avatar: '', role: 'user', karma: 1200, joinedHubs: ['Valorant'], favoriteGames: ['Valorant'], createdAt: new Date('2023-08-11').toISOString(), postCount: 12, commentCount: 34 },
+  CreeperSlayer: { _id: 'u4', username: 'CreeperSlayer', email: 'creeper@example.com', bio: 'Builder and Redstone engineer.', avatar: '', role: 'user', karma: 4300, joinedHubs: ['Minecraft'], favoriteGames: ['Minecraft'], createdAt: new Date('2022-02-15').toISOString(), postCount: 22, commentCount: 104 },
+  awpGod_official: { _id: 'u5', username: 'awpGod_official', email: 'awpgod@example.com', bio: 'Faceit Level 10. CS is life.', avatar: '', role: 'user', karma: 8900, joinedHubs: ['CSGO2'], favoriteGames: ['CS2'], createdAt: new Date('2021-11-01').toISOString(), postCount: 56, commentCount: 210 },
+  GoalMachine_88: { _id: 'u6', username: 'GoalMachine_88', email: 'goal@example.com', bio: 'FUT Trader and Weekend League sweat.', avatar: '', role: 'user', karma: 2100, joinedHubs: ['FIFA25'], favoriteGames: ['EA Sports FC 25'], createdAt: new Date('2023-09-22').toISOString(), postCount: 18, commentCount: 45 },
+  EuroFragger: { _id: 'u7', username: 'EuroFragger', email: 'euro@example.com', bio: 'EU Valorant player.', avatar: '', role: 'user', karma: 500, joinedHubs: ['Valorant'], favoriteGames: ['Valorant'], createdAt: new Date('2023-12-10').toISOString(), postCount: 5, commentCount: 12 },
 };
 
 /* Mock post history for each user */

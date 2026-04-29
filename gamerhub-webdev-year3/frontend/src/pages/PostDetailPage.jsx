@@ -136,6 +136,11 @@ Feel free to ask questions!`,
     hub:    { _id: 'h4', name: 'Elden Ring', slug: 'elden-ring' },
     createdAt: new Date(Date.now() - 5 * 86400 * 1000).toISOString(),
   },
+  lfg1: { _id: 'lfg1', title: '[Valorant] Diamond 5-stack — EU servers, weekday evenings', content: 'Looking for 2 players to complete our 5-stack. Must have mic, be positive, and know basics.', voteScore: 45, type: 'lfg', commentCount: 0, tags: [], isPinned: false, isLocked: false, author: { username: 'EuroFragger' }, hub: { _id: 'h1', name: 'Valorant', slug: 'valorant' }, createdAt: new Date(Date.now() - 30 * 60 * 1000).toISOString() },
+  lfg2: { _id: 'lfg2', title: '[Minecraft] SMP looking for active builders', content: 'Running a whitelist SMP with 8 people, need 2 more active players who love building.', voteScore: 31, type: 'lfg', commentCount: 0, tags: [], isPinned: false, isLocked: false, author: { username: 'CreeperSlayer' }, hub: { _id: 'h2', name: 'Minecraft', slug: 'minecraft' }, createdAt: new Date(Date.now() - 3 * 3600 * 1000).toISOString() },
+  lfg3: { _id: 'lfg3', title: '[CS2] NA Faceit Level 8+ looking for team', content: 'LFM for a serious Faceit team. Practice schedule 3 nights/week.', voteScore: 88, type: 'lfg', commentCount: 0, tags: [], isPinned: false, isLocked: false, author: { username: 'awpGod_official' }, hub: { _id: 'h5', name: 'CSGO2', slug: 'csgo2' }, createdAt: new Date(Date.now() - 6 * 3600 * 1000).toISOString() },
+  lfg4: { _id: 'lfg4', title: '[Elden Ring] Co-op helpers needed — Malenia fight', content: 'Completely lost. Need 2 experienced summons for Malenia. PS5.', voteScore: 12, type: 'lfg', commentCount: 0, tags: [], isPinned: false, isLocked: false, author: { username: 'NewTarnished' }, hub: { _id: 'h4', name: 'Elden Ring', slug: 'elden-ring' }, createdAt: new Date(Date.now() - 45 * 60 * 1000).toISOString() },
+  lfg5: { _id: 'lfg5', title: '[Valorant] Unrated fun games — any rank welcome', content: 'Casual 5-stack for unrated. No sweat, just chill and have fun.', voteScore: 24, type: 'lfg', commentCount: 0, tags: [], isPinned: false, isLocked: false, author: { username: 'ChillGamer' }, hub: { _id: 'h1', name: 'Valorant', slug: 'valorant' }, createdAt: new Date(Date.now() - 12 * 3600 * 1000).toISOString() },
 };
 
 const MOCK_COMMENTS = {
