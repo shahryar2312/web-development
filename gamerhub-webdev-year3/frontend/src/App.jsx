@@ -14,6 +14,7 @@ import PostDetailPage from './pages/PostDetailPage';
 import LFGPage from './pages/LFGPage';
 import CreatePostPage from './pages/CreatePostPage';
 import UserProfilePage from './pages/UserProfilePage';
+import AdminDashboard from './pages/AdminDashboard';
 
 function App() {
   return (
@@ -50,6 +51,9 @@ function App() {
           {/* View 7 — User Profile page (Screen 4 from proposal wireframes) */}
           {/* Matches GET /api/users/:username on the backend */}
           <Route path="/user/:username"          element={<UserProfilePage />} />
+
+          {/* View 8 — Admin Dashboard */}
+          <Route path="/admin"                   element={<AdminDashboard />} />
 
           {/* 404 fallback */}
           <Route path="*" element={

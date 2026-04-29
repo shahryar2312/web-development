@@ -80,6 +80,9 @@ function Navbar() {
           <nav className="navbar__links" aria-label="Main navigation">
             <NavLink to="/"    className="navbar__link" end>Home</NavLink>
             <NavLink to="/lfg" className="navbar__link">LFG</NavLink>
+            {isLoggedIn && user?.role === 'admin' && (
+              <NavLink to="/admin" className="navbar__link" style={{ color: 'var(--color-accent)' }}>Admin Panel</NavLink>
+            )}
           </nav>
 
           {/* ---- Auth / user section ---- */}
@@ -146,6 +149,9 @@ function Navbar() {
 
         <Link to="/"    className="navbar__mobile-link" onClick={() => setMenuOpen(false)}>🏠 Home</Link>
         <Link to="/lfg" className="navbar__mobile-link" onClick={() => setMenuOpen(false)}>👥 LFG</Link>
+        {isLoggedIn && user?.role === 'admin' && (
+          <Link to="/admin" className="navbar__mobile-link" style={{ color: 'var(--color-accent)' }} onClick={() => setMenuOpen(false)}>🛡️ Admin Panel</Link>
+        )}
 
         {isLoggedIn ? (
           <>

@@ -24,6 +24,20 @@ import './UserProfilePage.css';
 /* ------------------------------------------------------------------ */
 
 const MOCK_USERS = {
+  admin: {
+    _id:        'mock-admin-id-001',
+    username:   'admin',
+    email:      'admin@gamerhub.com',
+    bio:        'Platform Administrator. Keeping the peace on GamerHub.',
+    avatar:     '',
+    role:       'admin',
+    karma:      99999,
+    joinedHubs: ['Valorant', 'Minecraft'],
+    favoriteGames: ['Valorant', 'Minecraft'],
+    createdAt:  new Date('2023-01-01').toISOString(),
+    postCount:  10,
+    commentCount: 50,
+  },
   tarnished_one: {
     _id:        'u1',
     username:   'tarnished_one',
@@ -208,8 +222,28 @@ function UserProfilePage() {
   const { username }           = useParams();
   const { user: loggedInUser } = useAuth();
 
-  // Find the mock user by username; fall back to a "not found" state
-  const [profileUser, setProfileUser] = useState(MOCK_USERS[username] ?? null);
+  // Find the mock user by username
+  let initialProfile = MOCK_USERS[username];
+
+  // If not in MOCK_USERS but it's the currently logged-in user, use their session data
+  if (!initialProfile && loggedInUser?.username === username) {
+    initialProfile = {
+      _id: loggedInUser._id,
+      username: loggedInUser.username,
+      email: loggedInUser.email,
+      bio: loggedInUser.bio || '',
+      avatar: loggedInUser.avatar || '',
+      role: loggedInUser.role || 'user',
+      karma: 0,
+      joinedHubs: loggedInUser.joinedHubs || [],
+      favoriteGames: loggedInUser.favoriteGames || [],
+      createdAt: new Date().toISOString(),
+      postCount: 0,
+      commentCount: 0,
+    };
+  }
+
+  const [profileUser, setProfileUser] = useState(initialProfile ?? null);
   const userPosts = MOCK_USER_POSTS[username] ?? [];
 
   // Active tab: 'posts' | 'comments' | 'saved' | 'activity'

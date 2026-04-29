@@ -70,13 +70,14 @@ export function AuthProvider({ children }) {
        */
 
       // Mock: accept any credentials and return a fake user object
+      const isAdmin = email.toLowerCase() === 'admin@gamerhub.com';
       const mockUser = {
-        _id:      'mock-user-id-001',
+        _id:      isAdmin ? 'mock-admin-id-001' : 'mock-user-id-001',
         username: email.split('@')[0],
         email,
         avatar:   '',
-        bio:      'Gaming enthusiast',
-        role:     'user',
+        bio:      isAdmin ? 'Platform Administrator' : 'Gaming enthusiast',
+        role:     isAdmin ? 'admin' : 'user',
         joinedHubs:    [],
         favoriteGames: ['Valorant', 'Minecraft'],
       };
