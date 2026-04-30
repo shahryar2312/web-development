@@ -1,0 +1,167 @@
+/* ============================================================
+   AuthPage.css — Shared styles for Login and Register pages
+   ============================================================ */
+
+/* ---------- Page wrapper — centres the card vertically ---------- */
+.auth-page {
+  min-height: calc(100vh - 60px); /* subtract navbar height */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-6) var(--space-4);
+  background: var(--color-bg);
+}
+
+/* ---------- Card ---------- */
+.auth-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-8);
+  width: 100%;
+  max-width: 440px;
+  box-shadow: var(--shadow-md);
+}
+
+/* ---------- Card header ---------- */
+.auth-card__header {
+  text-align: center;
+  margin-bottom: var(--space-6);
+}
+
+.auth-card__logo {
+  display: inline-block;
+  font-size: var(--fs-xl);
+  font-weight: 800;
+  color: var(--color-text) !important;
+  margin-bottom: var(--space-4);
+  text-decoration: none;
+}
+
+.auth-card__title {
+  font-size: var(--fs-2xl);
+  font-weight: 800;
+  margin-bottom: var(--space-2);
+}
+
+.auth-card__subtitle {
+  color: var(--color-text-muted);
+  font-size: var(--fs-sm);
+}
+
+/* ---------- Form spacing ---------- */
+.auth-card form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* ---------- Input with toggle button ---------- */
+.auth-input-group {
+  position: relative;
+  display: flex;
+}
+
+.auth-input-group .form-input {
+  padding-right: 3rem; /* make room for toggle button */
+}
+
+.auth-input-group__toggle {
+  position: absolute;
+  right: var(--space-3);
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  font-size: var(--fs-md);
+  padding: 0;
+  line-height: 1;
+  transition: color var(--transition);
+}
+
+.auth-input-group__toggle:hover {
+  color: var(--color-text);
+}
+
+/* ---------- Field hint (helper text) ---------- */
+.field-hint {
+  font-size: var(--fs-xs);
+  color: var(--color-text-muted);
+  margin-top: var(--space-1);
+}
+
+/* ---------- Password strength bar ---------- */
+.password-strength {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.password-strength__bar {
+  height: 4px;
+  border-radius: var(--radius-full);
+  background: var(--color-border);
+  flex: 1;
+  transition: width 0.3s ease, background 0.3s ease;
+}
+
+.strength--weak   .password-strength__bar,
+.password-strength__bar.strength--weak   { background: var(--color-danger); }
+.strength--fair   .password-strength__bar,
+.password-strength__bar.strength--fair   { background: var(--color-warning); }
+.strength--strong .password-strength__bar,
+.password-strength__bar.strength--strong { background: var(--color-success); }
+
+.password-strength__label {
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  min-width: 42px;
+  color: var(--color-text-muted);
+}
+
+/* ---------- Forgot password link ---------- */
+.auth-card__forgot {
+  text-align: right;
+  font-size: var(--fs-xs);
+  margin-top: calc(-1 * var(--space-2));
+}
+
+/* ---------- Submit button ---------- */
+.auth-card__submit {
+  width: 100%;
+  justify-content: center;
+  padding: var(--space-3);
+  font-size: var(--fs-md);
+  margin-top: var(--space-2);
+}
+
+.auth-card__submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ---------- Switch link (login ↔ register) ---------- */
+.auth-card__switch {
+  text-align: center;
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+}
+
+.auth-card__switch-link {
+  font-weight: 700;
+  color: var(--color-primary) !important;
+}
+
+.auth-card__switch-link:hover {
+  text-decoration: underline;
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 480px) {
+  .auth-card {
+    padding: var(--space-6) var(--space-4);
+    border-radius: var(--radius-md);
+  }
+}

@@ -3,7 +3,7 @@ const { body } = require('express-validator');
 const router = express.Router();
 
 const {
-  getHubs, createHub, getHub, updateHub, deleteHub,
+  getHubs, createHub, getHub, getHubBySlug, updateHub, deleteHub,
   joinHub, leaveHub, getHubMembers,
   addModerator, removeModerator, hubBanUser, hubUnbanUser,
 } = require('../controllers/hub.controller');
@@ -36,6 +36,7 @@ const updateRules = [
 
 router.get('/',                  getHubs);
 router.post('/',                 protect, createRules, validateRequest, createHub);
+router.get('/slug/:slug',        getHubBySlug);
 router.get('/:hubId',            getHub);
 router.put('/:hubId',            protect, updateRules, validateRequest, updateHub);
 router.delete('/:hubId',         protect,              deleteHub);

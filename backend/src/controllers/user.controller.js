@@ -29,6 +29,7 @@ const updateMe = asyncHandler(async (req, res) => {
   const updates = {};
   if (req.body.bio !== undefined) updates.bio = req.body.bio;
   if (req.body.avatar !== undefined) updates.avatar = req.body.avatar;
+  if (req.body.favoriteGames !== undefined) updates.favoriteGames = req.body.favoriteGames;
 
   const user = await User.findByIdAndUpdate(req.user._id, updates, {
     new: true,

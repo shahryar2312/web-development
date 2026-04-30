@@ -82,6 +82,20 @@ const getHub = asyncHandler(async (req, res) => {
 });
 
 /**
+ * 29.04 Ilia Klodin - added slug0based lookup for hubs to accomodate frontend routing
+ * @desc    Get a single hub by slug
+ * @route   GET /api/hubs/slug/:slug
+ * @access  Public
+ */
+const getHubBySlug = asyncHandler(async (req, res) => {
+  const hub = await Hub.findOne({ slug: req.params.slug })
+    .populate('creator', 'username avatar')
+    .populate('moderators', 'username avatar');
+  if (!hub) return error(res, 'Hub not found.', 404);
+  return success(res, { hub });
+});
+
+/**
  * @desc    Update hub settings
  * @route   PUT /api/hubs/:hubId
  * @access  Private
@@ -334,6 +348,7 @@ module.exports = {
   getHubs,
   createHub,
   getHub,
+  getHubBySlug,
   updateHub,
   deleteHub,
   joinHub,

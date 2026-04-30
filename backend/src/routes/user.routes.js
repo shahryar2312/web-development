@@ -10,6 +10,8 @@ const validateRequest = require('../middleware/validateRequest');
 const updateMeRules = [
   body('bio').optional().isLength({ max: 500 }).withMessage('Bio cannot exceed 500 characters'),
   body('avatar').optional().isURL().withMessage('Avatar must be a valid URL'),
+  body('favoriteGames').optional().isArray({ max: 5 }).withMessage('Maximum 5 favourite games'),
+  body('favoriteGames.*').optional().isString().isLength({ max: 50 }).withMessage('Each game name cannot exceed 50 characters'),
 ];
 
 const updatePasswordRules = [
