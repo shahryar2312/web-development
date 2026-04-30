@@ -1,0 +1,10 @@
+meta {
+  name: Remove Moderator
+  type: http
+  seq: 7
+}
+
+delete {
+  url: {{baseUrl}}/api/hubs/{{hubId}}/moderators/{{targetUserId}}
+  body: none
+}

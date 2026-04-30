@@ -1,0 +1,19 @@
+meta {
+  name: Global Search
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/search?q=MechWarrior&type=all&page=1&limit=10
+  body: none
+  auth: none
+}
+
+params:query {
+  q: MechWarrior
+  type: all
+  page: 1
+  limit: 10
+  ~type: posts
+}

@@ -1,0 +1,16 @@
+meta {
+  name: Get Comments
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/posts/{{postId}}/comments
+  body: none
+}
+
+params:query {
+  page: 1
+  sort: best
+  ~parentId:
+}

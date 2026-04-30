@@ -1,0 +1,23 @@
+meta {
+  name: List Hubs
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/hubs
+  body: none
+}
+
+params:query {
+  page: 1
+  sort: popular
+  ~search: mechwarrior
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body.success && body.data.hubs.length > 0) {
+    bru.setVar("hubId", body.data.hubs[0]._id);
+  }
+}

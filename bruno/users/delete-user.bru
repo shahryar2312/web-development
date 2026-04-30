@@ -1,0 +1,10 @@
+meta {
+  name: Delete User
+  type: http
+  seq: 5
+}
+
+delete {
+  url: {{baseUrl}}/api/users/{{targetUserId}}
+  body: none
+}

@@ -1,0 +1,10 @@
+meta {
+  name: Hub Ban User
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/api/hubs/{{hubId}}/ban/{{targetUserId}}
+  body: none
+}
