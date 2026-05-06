@@ -2,95 +2,26 @@
  * UserProfilePage.jsx — View 7: User Profile (Screen 4 from proposal wireframes)
  *
  * Proposal spec (§4.2 Screen 4):
- *   "Header with avatar, username, join date, karma. Bio below.
- *    Tabs for Posts, Comments, Saved, Activity.
+ *   "Header with avatar, username, join date. Bio below.
+ *    Tabs for Posts, Comments, Saved.
  *    Edit button shown only on own profile. Mobile: stacked."
  *
- * Public view  — shows bio, karma, post history, joined hubs
+ * Public view  — shows bio, post/comment history, joined hubs
  * Private view — shows edit profile form (only when viewing own profile)
  *
  * Maps to backend endpoints:
- *   Profile data — GET  /api/users/:username
- *   User posts   — GET  /api/users/:username/posts
- *   Edit profile — PUT  /api/users/:userId  { bio, avatar, favoriteGames }
+ *   Profile data    — GET /api/users/:username
+ *   User posts      — GET /api/users/:username/posts
+ *   User comments   — GET /api/users/:username/comments
+ *   Edit profile    — PUT /api/users/me  { bio, favoriteGames }
+ *   Avatar upload   — PUT /api/users/me/avatar  (multipart/form-data, field: avatar)
+ *   Saved posts     — GET /api/users/me/saved  (own profile only)
  */
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { api } from '../services/api';
 import './UserProfilePage.css';
-
-/* ------------------------------------------------------------------ */
-/* Mock Data — mirrors the User model in backend/src/models/User.js    */
-/* ------------------------------------------------------------------ */
-
-/*
- 29.04 Ilia Klodin - future proofing for integration later on
- previous mock version used plain strings but our backend returns objects [{ name, slug }]
- */
-const MOCK_USERS = {
-  admin: {
-    _id:        'mock-admin-id-001',
-    username:   'admin',
-    email:      'admin@gamerhub.com',
-    bio:        'Platform Administrator. Keeping the peace on GamerHub.',
-    avatar:     '',
-    role:       'admin',
-    karma:      99999,
-    joinedHubs: [
-      { name: 'Valorant', slug: 'valorant' },
-      { name: 'Minecraft', slug: 'minecraft' },
-    ],
-    favoriteGames: ['Valorant', 'Minecraft'],
-    createdAt:  new Date('2023-01-01').toISOString(),
-    postCount:  10,
-    commentCount: 50,
-  },
-  tarnished_one: {
-    _id:        'u1',
-    username:   'tarnished_one',
-    email:      'tarnished@example.com',
-    bio:        'Platinum hunter. Elden Ring veteran. 87 Malenia attempts and counting. I review FromSoftware games in my spare time.',
-    avatar:     '',
-    role:       'user',
-    karma:      9842,
-    joinedHubs: [
-      { name: 'Elden Ring', slug: 'elden-ring' },
-      { name: 'Valorant',   slug: 'valorant' },
-    ],
-    favoriteGames: ['Elden Ring', 'Dark Souls III', 'Sekiro'],
-    createdAt:  new Date('2024-01-15').toISOString(),
-    postCount:  48,
-    commentCount: 213,
-  },
-  RadiantCoach: {
-    _id:        'u2',
-    username:   'RadiantCoach',
-    email:      'coach@example.com',
-    bio:        'Professional Valorant coach. Radiant rank. Helping players climb since 2021.',
-    avatar:     '',
-    role:       'user',
-    karma:      21400,
-    joinedHubs: [
-      { name: 'Valorant', slug: 'valorant' },
-      { name: 'CSGO2',    slug: 'csgo2' },
-    ],
-    favoriteGames: ['Valorant', 'CS2'],
-    createdAt:  new Date('2023-06-01').toISOString(),
-    postCount:  112,
-    commentCount: 489,
-  },
-};
-
-/* Mock post history for each user */
-const MOCK_USER_POSTS = {
-  tarnished_one: [
-    { _id: 'p1', title: 'My first Platinum in Elden Ring after 200 hours — worth every second!', voteScore: 4821, commentCount: 312, hub: { name: 'Elden Ring', slug: 'elden-ring' }, createdAt: new Date(Date.now() - 2 * 3600 * 1000).toISOString() },
-    { _id: 'ep1', title: '[SPOILER] Ending lore breakdown — all 6 endings explained', voteScore: 5210, commentCount: 302, hub: { name: 'Elden Ring', slug: 'elden-ring' }, createdAt: new Date(Date.now() - 5 * 86400 * 1000).toISOString() },
-  ],
-  RadiantCoach: [
-    { _id: 'vp1', title: 'Immortal 3 → Radiant in 2 weeks — here is my full routine', voteScore: 3402, commentCount: 214, hub: { name: 'Valorant', slug: 'valorant' }, createdAt: new Date(Date.now() - 3 * 3600 * 1000).toISOString() },
-  ],
-};
 
 /* ------------------------------------------------------------------ */
 /* EditProfileForm sub-component                                         */
@@ -98,18 +29,30 @@ const MOCK_USER_POSTS = {
 
 /**
  * EditProfileForm — Inline form shown when the user edits their own profile.
- * Maps to: PUT /api/users/:userId  { bio, favoriteGames }
+ * Avatar is handled separately (its own "Update Avatar" button) to avoid
+ * FormData/array serialisation issues with favoriteGames.
+ * Maps to: PUT /api/users/me  { bio, favoriteGames }
+ *          PUT /api/users/me/avatar  (multipart/form-data, field: avatar)
  *
  * Validation:
- *   bio — max 500 characters
+ *   bio           — max 500 characters
  *   favoriteGames — max 5 entries, each max 50 characters
  */
-function EditProfileForm({ user, onSave, onCancel }) {
-  const [bio,           setBio]           = useState(user.bio);
-  const [gamesInput,    setGamesInput]    = useState(user.favoriteGames.join(', '));
-  const [errors,        setErrors]        = useState({});
-  const [saving,        setSaving]        = useState(false);
-  const [successMsg,    setSuccessMsg]    = useState('');
+function EditProfileForm({ profileUser, onSave, onCancel }) {
+  const { refreshUser } = useAuth();
+
+  const [bio,        setBio]        = useState(profileUser.bio || '');
+  const [gamesInput, setGamesInput] = useState((profileUser.favoriteGames || []).join(', '));
+  const [errors,     setErrors]     = useState({});
+  const [saving,     setSaving]     = useState(false);
+  const [successMsg, setSuccessMsg] = useState('');
+
+  const [avatarTab,     setAvatarTab]     = useState('file');
+  const [avatarFile,    setAvatarFile]    = useState(null);
+  const [avatarUrl,     setAvatarUrl]     = useState('');
+  const [avatarSaving,  setAvatarSaving]  = useState(false);
+  const [avatarError,   setAvatarError]   = useState('');
+  const [avatarSuccess, setAvatarSuccess] = useState('');
 
   /**
    * validate — Client-side checks for the edit profile form.
@@ -136,7 +79,7 @@ function EditProfileForm({ user, onSave, onCancel }) {
   };
 
   /**
-   * handleSave — Submits the profile update.
+   * handleSave — Submits the profile update (bio + favoriteGames).
    * Maps to: PUT /api/users/me  { bio, favoriteGames }
    */
   const handleSave = async (e) => {
@@ -144,41 +87,81 @@ function EditProfileForm({ user, onSave, onCancel }) {
     if (!validate()) return;
 
     setSaving(true);
-
-    /*
-     * --- BACKEND INTEGRATION POINT ---
-     * const res = await fetch('/api/users/me', {
-     *   method: 'PUT',
-     *   headers: { 'Content-Type': 'application/json' },
-     *   credentials: 'include',
-     *   body: JSON.stringify({
-     *     bio: bio.trim(),
-     *     favoriteGames: gamesInput.split(',').map((g) => g.trim()).filter(Boolean),
-     *   }),
-     * });
-     * const data = await res.json();
-     * if (res.ok) { onSave(data.user); }
-     */
-
-    // Mock: call onSave with the updated data
-    setTimeout(() => {
+    setErrors({});
+    try {
+      const games = gamesInput.split(',').map((g) => g.trim()).filter(Boolean);
+      await api.put('/api/users/me', { bio: bio.trim(), favoriteGames: games });
+      await refreshUser();
+      setSuccessMsg('Profile updated!');
+      onSave();
+    } catch (err) {
+      setErrors((p) => ({ ...p, _submit: err.message }));
+    } finally {
       setSaving(false);
-      setSuccessMsg('Profile updated successfully!');
-      onSave({
-        ...user,
-        bio: bio.trim(),
-        favoriteGames: gamesInput.split(',').map((g) => g.trim()).filter(Boolean),
-      });
-    }, 600);
+    }
+  };
+
+  /**
+   * handleAvatarUpdate — Uploads a new avatar.
+   * File upload: PUT /api/users/me/avatar  (multipart/form-data, field: avatar)
+   * URL update:  PUT /api/users/me         { avatar: url }
+   * Kept as a separate action so favoriteGames array serialises cleanly via JSON.
+   */
+  // 03.05 Ilia Klodin: kept separate from bio/games update because favoriteGames array doesnt serialize cleanly in FormData
+  const handleAvatarUpdate = async () => {
+    setAvatarError('');
+    setAvatarSuccess('');
+
+    if (avatarTab === 'file' && !avatarFile) {
+      setAvatarError('Please select an image file.');
+      return;
+    }
+    if (avatarTab === 'url' && !avatarUrl.trim()) {
+      setAvatarError('Please enter a URL.');
+      return;
+    }
+
+    setAvatarSaving(true);
+    try {
+      if (avatarTab === 'file') {
+        const fd = new FormData();
+        fd.append('avatar', avatarFile);
+        await api.put('/api/users/me/avatar', fd);
+      } else {
+        await api.put('/api/users/me', { avatar: avatarUrl.trim() });
+      }
+      await refreshUser();
+      setAvatarSuccess('Avatar updated!');
+      onSave();
+    } catch (err) {
+      setAvatarError(err.message);
+    } finally {
+      setAvatarSaving(false);
+    }
   };
 
   return (
     <form className="edit-profile-form card" onSubmit={handleSave} noValidate aria-label="Edit profile form">
       <h3 className="edit-profile-form__title">Edit Profile</h3>
 
-      {successMsg && (
-        <div className="alert alert-success" role="status">{successMsg}</div>
-      )}
+      {/* Avatar — separate action to avoid FormData/array serialisation issues */}
+      <div className="form-group">
+        <label className="form-label">Avatar</label>
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+          <button type="button" className={`btn btn-sm ${avatarTab === 'file' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setAvatarTab('file')}>Upload File</button>
+          <button type="button" className={`btn btn-sm ${avatarTab === 'url'  ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setAvatarTab('url')}>Enter URL</button>
+        </div>
+        {avatarTab === 'file' ? (
+          <input type="file" className="form-input" accept="image/*" onChange={(e) => setAvatarFile(e.target.files[0] || null)} />
+        ) : (
+          <input type="url" className="form-input" placeholder="https://example.com/avatar.jpg" value={avatarUrl} onChange={(e) => setAvatarUrl(e.target.value)} />
+        )}
+        {avatarError   && <p className="field-error">{avatarError}</p>}
+        {avatarSuccess && <p style={{ color: 'var(--color-success)', fontSize: 'var(--fs-sm)', marginTop: '0.25rem' }}>{avatarSuccess}</p>}
+        <button type="button" className="btn btn-secondary btn-sm" style={{ marginTop: '0.5rem' }} onClick={handleAvatarUpdate} disabled={avatarSaving}>
+          {avatarSaving ? 'Updating…' : 'Update Avatar'}
+        </button>
+      </div>
 
       {/* Bio */}
       <div className="form-group">
@@ -217,6 +200,9 @@ function EditProfileForm({ user, onSave, onCancel }) {
         {errors.games && <span id="ep-games-error" className="field-error" role="alert">{errors.games}</span>}
       </div>
 
+      {errors._submit && <div className="alert alert-error">{errors._submit}</div>}
+      {successMsg    && <div className="alert alert-success" role="status">{successMsg}</div>}
+
       <div className="edit-profile-form__actions">
         <button type="submit" className="btn btn-primary" disabled={saving} aria-busy={saving}>
           {saving ? 'Saving…' : 'Save Changes'}
@@ -235,56 +221,135 @@ function UserProfilePage() {
   const { username }           = useParams();
   const { user: loggedInUser } = useAuth();
 
-  // Find the mock user by username
-  let initialProfile = MOCK_USERS[username];
+  const [profileUser,  setProfileUser]  = useState(null);
+  const [loading,      setLoading]      = useState(true);
+  const [error,        setError]        = useState('');
 
-  // If not in MOCK_USERS but it's the currently logged-in user, use their session data
-  if (!initialProfile && loggedInUser?.username === username) {
-    initialProfile = {
-      _id: loggedInUser._id,
-      username: loggedInUser.username,
-      email: loggedInUser.email,
-      bio: loggedInUser.bio || '',
-      avatar: loggedInUser.avatar || '',
-      role: loggedInUser.role || 'user',
-      karma: 0,
-      joinedHubs: loggedInUser.joinedHubs || [],
-      favoriteGames: loggedInUser.favoriteGames || [],
-      createdAt: new Date().toISOString(),
-      postCount: 0,
-      commentCount: 0,
-    };
-  }
-
-  const [profileUser, setProfileUser] = useState(initialProfile ?? null);
-  const userPosts = MOCK_USER_POSTS[username] ?? [];
-
-  // Active tab: 'posts' | 'comments' | 'saved' | 'activity'
-  const [activeTab, setActiveTab] = useState('posts');
+  // Active tab: 'posts' | 'comments' | 'saved'
+  const [activeTab,    setActiveTab]    = useState('posts');
 
   // Edit mode — only available on own profile
-  const [editMode, setEditMode] = useState(false);
+  const [editMode,     setEditMode]     = useState(false);
+
+  /* ---- Posts tab ---- */
+  const [posts,        setPosts]        = useState([]);
+  const [postsTotal,   setPostsTotal]   = useState(0);
+  const [postsPage,    setPostsPage]    = useState(1);
+  const [postsMore,    setPostsMore]    = useState(false);
+  const [postsLoading, setPostsLoading] = useState(false);
+
+  /* ---- Comments tab ---- */
+  const [comments,        setComments]        = useState([]);
+  const [commentsTotal,   setCommentsTotal]   = useState(0);
+  const [commentsPage,    setCommentsPage]    = useState(1);
+  const [commentsMore,    setCommentsMore]    = useState(false);
+  const [commentsLoading, setCommentsLoading] = useState(false);
+
+  /* ---- Saved tab (own profile only) ---- */
+  const [savedPosts,   setSavedPosts]   = useState([]);
+  const [savedLoading, setSavedLoading] = useState(false);
+  const [savedError,   setSavedError]   = useState('');
 
   // Whether the logged-in user is viewing their own profile
   const isOwnProfile = loggedInUser?.username === username;
 
-  /* ---- Not found ---- */
-  if (!profileUser) {
-    return (
-      <div className="container empty-state" style={{ marginTop: '4rem' }}>
-        <h2>User not found</h2>
-        <p>The user <strong>u/{username}</strong> does not exist.</p>
-        <Link to="/" className="btn btn-primary" style={{ marginTop: '1rem' }}>Go Home</Link>
-      </div>
-    );
-  }
+  /**
+   * fetchProfile — Loads profile data, posts, and comments in parallel.
+   * Page counters are reset to 1 whenever the username param changes.
+   * Maps to:
+   *   GET /api/users/:username
+   *   GET /api/users/:username/posts?page=1
+   *   GET /api/users/:username/comments?page=1
+   */
+  // 03.05 Ilia Klodin: parallel loading of profile data, posts, and comments for better user experince
+  const fetchProfile = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    setPostsPage(1);
+    setCommentsPage(1);
+    try {
+      const [profileData, postsData, commentsData] = await Promise.all([
+        api.get(`/api/users/${username}`),
+        api.get(`/api/users/${username}/posts?page=1`),
+        api.get(`/api/users/${username}/comments?page=1`),
+      ]);
+      setProfileUser(profileData.user);
+      setPosts(postsData.posts || []);
+      // 03.05 Ilia Klodin: user model has no postCount field, for now using total from pagination, might change later
+      setPostsTotal(postsData._meta?.total ?? 0);
+      setPostsMore(1 < (postsData._meta?.pages ?? 1));
+      setComments(commentsData.comments || []);
+      setCommentsTotal(commentsData._meta?.total ?? 0);
+      setCommentsMore(1 < (commentsData._meta?.pages ?? 1));
+    } catch (err) {
+      setError(err.status === 404 ? 'User not found.' : 'Failed to load profile.');
+    } finally {
+      setLoading(false);
+    }
+  }, [username]);
+
+  useEffect(() => {
+    fetchProfile();
+  }, [fetchProfile]);
+
+  /* ---- Fetch saved posts when switching to saved tab (own profile only) ---- */
+  // 03.05 Ilia Klodin: saved tab is only visible to profile owner so no point fetching for visitors
+  useEffect(() => {
+    if (activeTab !== 'saved' || !isOwnProfile) return;
+    setSavedLoading(true);
+    setSavedError('');
+    api.get('/api/users/me/saved')
+      .then((data) => setSavedPosts(data.posts || []))
+      .catch((err) => setSavedError(err.message || 'Failed to load saved posts.'))
+      .finally(() => setSavedLoading(false));
+  }, [activeTab, isOwnProfile]);
+
+  /* ---- Load more posts ---- */
+  const handleLoadMorePosts = async () => {
+    const next = postsPage + 1;
+    setPostsPage(next);
+    setPostsLoading(true);
+    try {
+      const data = await api.get(`/api/users/${username}/posts?page=${next}`);
+      setPosts((prev) => [...prev, ...(data.posts || [])]);
+      setPostsMore(next < (data._meta?.pages ?? 1));
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setPostsLoading(false);
+    }
+  };
+
+  /* ---- Load more comments ---- */
+  const handleLoadMoreComments = async () => {
+    const next = commentsPage + 1;
+    setCommentsPage(next);
+    setCommentsLoading(true);
+    try {
+      const data = await api.get(`/api/users/${username}/comments?page=${next}`);
+      setComments((prev) => [...prev, ...(data.comments || [])]);
+      setCommentsMore(next < (data._meta?.pages ?? 1));
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setCommentsLoading(false);
+    }
+  };
 
   /**
-   * formatDate — Converts ISO date to a readable join date string.
+   * handleEditSave — Called after EditProfileForm saves successfully.
+   * Re-fetches profile so header stats and bio refresh.
    */
-  const formatJoinDate = (iso) => {
-    return new Date(iso).toLocaleDateString('en-IE', { year: 'numeric', month: 'long', day: 'numeric' });
+  const handleEditSave = async () => {
+    setEditMode(false);
+    await fetchProfile();
   };
+
+  /**
+   * formatJoinDate — Converts ISO date to a readable join date string.
+   */
+  const formatJoinDate = (iso) =>
+    new Date(iso).toLocaleDateString('en-IE', { year: 'numeric', month: 'long', day: 'numeric' });
 
   const formatRelative = (iso) => {
     const delta = (Date.now() - new Date(iso).getTime()) / 1000;
@@ -293,27 +358,110 @@ function UserProfilePage() {
     return `${Math.floor(delta / 86400)}d ago`;
   };
 
-  /**
-   * handleEditSave — Receives updated user data from EditProfileForm.
-   */
-  const handleEditSave = (updatedUser) => {
-    setProfileUser(updatedUser);
-    setEditMode(false);
-  };
+  /* ---- Loading / error states ---- */
+  if (loading) return <div className="container empty-state" style={{ marginTop: '4rem' }}><p>Loading profile…</p></div>;
+  if (error)   return (
+    <div className="container empty-state" style={{ marginTop: '4rem' }}>
+      <h2>{error}</h2>
+      <Link to="/" className="btn btn-primary" style={{ marginTop: '1rem' }}>Go Home</Link>
+    </div>
+  );
+  if (!profileUser) return null;
 
   /* Tab content map */
   const TAB_CONTENT = {
     posts: (
       <div className="profile-posts">
-        {userPosts.length === 0 ? (
+        {posts.length === 0 ? (
           <div className="empty-state"><h3>No posts yet</h3></div>
         ) : (
-          userPosts.map((post) => (
+          <>
+            {posts.map((post) => (
+              <div key={post._id} className="profile-post-card card">
+                <div className="profile-post-card__meta">
+                  <Link to={`/hub/${post.hub?.slug}`} className="profile-post-card__hub">
+                    h/{post.hub?.name}
+                  </Link>
+                  <span>•</span>
+                  <time>{formatRelative(post.createdAt)}</time>
+                </div>
+                <Link to={`/post/${post._id}`} className="profile-post-card__title">
+                  {post.title}
+                </Link>
+                <div className="profile-post-card__stats">
+                  <span>▲ {post.voteScore?.toLocaleString() ?? 0} votes</span>
+                  <span>💬 {post.commentCount ?? 0} comments</span>
+                </div>
+              </div>
+            ))}
+            {postsMore && (
+              <div style={{ textAlign: 'center', marginTop: 'var(--space-4)' }}>
+                <button className="btn btn-secondary" onClick={handleLoadMorePosts} disabled={postsLoading}>
+                  {postsLoading ? 'Loading…' : 'Load more'}
+                </button>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    ),
+
+    comments: (
+      <div className="profile-posts">
+        {comments.length === 0 ? (
+          <div className="empty-state"><h3>No comments yet</h3></div>
+        ) : (
+          <>
+            {comments.map((comment) => (
+              <div key={comment._id} className="profile-post-card card">
+                <div className="profile-post-card__meta">
+                  {comment.post && (
+                    <>
+                      <Link to={`/post/${comment.post._id ?? comment.post}`} className="profile-post-card__hub">
+                        {comment.post.title ?? 'View post'}
+                      </Link>
+                      <span>•</span>
+                    </>
+                  )}
+                  <time>{formatRelative(comment.createdAt)}</time>
+                </div>
+                <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--color-text)', margin: '0.25rem 0 0' }}>
+                  {comment.content?.length > 200 ? `${comment.content.slice(0, 200)}…` : comment.content}
+                </p>
+              </div>
+            ))}
+            {commentsMore && (
+              <div style={{ textAlign: 'center', marginTop: 'var(--space-4)' }}>
+                <button className="btn btn-secondary" onClick={handleLoadMoreComments} disabled={commentsLoading}>
+                  {commentsLoading ? 'Loading…' : 'Load more'}
+                </button>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    ),
+
+    saved: (
+      <div className="profile-posts">
+        {savedLoading ? (
+          <div className="empty-state"><p>Loading saved posts…</p></div>
+        ) : savedError ? (
+          <div className="alert alert-error">{savedError}</div>
+        ) : savedPosts.length === 0 ? (
+          <div className="empty-state">
+            <h3>No saved posts yet</h3>
+            <p>Posts you save will appear here. Only you can see this tab.</p>
+          </div>
+        ) : (
+          savedPosts.map((post) => (
             <div key={post._id} className="profile-post-card card">
               <div className="profile-post-card__meta">
-                <Link to={`/hub/${post.hub.slug}`} className="profile-post-card__hub">
-                  h/{post.hub.name}
+                <Link to={`/hub/${post.hub?.slug}`} className="profile-post-card__hub">
+                  h/{post.hub?.name}
                 </Link>
+                <span>•</span>
+                <span>u/{post.author?.username}</span>
                 <span>•</span>
                 <time>{formatRelative(post.createdAt)}</time>
               </div>
@@ -321,47 +469,12 @@ function UserProfilePage() {
                 {post.title}
               </Link>
               <div className="profile-post-card__stats">
-                <span>▲ {post.voteScore.toLocaleString()} votes</span>
-                <span>💬 {post.commentCount} comments</span>
+                <span>▲ {post.voteScore?.toLocaleString() ?? 0} votes</span>
+                <span>💬 {post.commentCount ?? 0} comments</span>
               </div>
             </div>
           ))
         )}
-      </div>
-    ),
-    comments: (
-      <div className="empty-state">
-        <h3>Comment history</h3>
-        <p>
-          {/*
-           * --- BACKEND INTEGRATION POINT ---
-           * GET /api/users/:username/comments
-           * Fetches paginated comment history for this user.
-           */}
-          Comment history will load here from <code>GET /api/users/{username}/comments</code>.
-        </p>
-      </div>
-    ),
-    saved: (
-      <div className="empty-state">
-        <h3>Saved posts</h3>
-        {isOwnProfile
-          ? <p>Your saved posts appear here. Only you can see this tab.</p>
-          : <p>This tab is only visible to the profile owner.</p>
-        }
-      </div>
-    ),
-    activity: (
-      <div className="empty-state">
-        <h3>Recent activity</h3>
-        <p>
-          {/*
-           * --- BACKEND INTEGRATION POINT ---
-           * GET /api/users/:username/activity
-           * Returns a combined feed of posts, comments, and votes.
-           */}
-          Activity feed will load from <code>GET /api/users/{username}/activity</code>.
-        </p>
       </div>
     ),
   };
@@ -384,20 +497,18 @@ function UserProfilePage() {
         <div className="profile-header__info">
           <div className="profile-header__name-row">
             <h1 className="profile-header__username">u/{profileUser.username}</h1>
-            {profileUser.role === 'admin' && <span className="badge badge-danger">Admin</span>}
+            {profileUser.role === 'admin'     && <span className="badge badge-danger">Admin</span>}
+            {profileUser.role === 'moderator' && <span className="badge badge-warning">Mod</span>}
+            {profileUser.isBanned             && <span className="badge badge-danger">Banned</span>}
           </div>
 
           <div className="profile-header__stats">
             <div className="profile-stat">
-              <strong>{profileUser.karma.toLocaleString()}</strong>
-              <span>Karma</span>
-            </div>
-            <div className="profile-stat">
-              <strong>{profileUser.postCount}</strong>
+              <strong>{postsTotal.toLocaleString()}</strong>
               <span>Posts</span>
             </div>
             <div className="profile-stat">
-              <strong>{profileUser.commentCount}</strong>
+              <strong>{commentsTotal.toLocaleString()}</strong>
               <span>Comments</span>
             </div>
           </div>
@@ -411,7 +522,7 @@ function UserProfilePage() {
           )}
 
           {/* Favourite games */}
-          {profileUser.favoriteGames.length > 0 && (
+          {profileUser.favoriteGames?.length > 0 && (
             <div className="profile-header__games">
               <span className="profile-header__games-label">🎮 Favourite games:</span>
               {profileUser.favoriteGames.map((game) => (
@@ -421,16 +532,16 @@ function UserProfilePage() {
           )}
 
           {/* Joined hubs */}
-          {profileUser.joinedHubs.length > 0 && (
+          {profileUser.joinedHubs?.length > 0 && (
             <div className="profile-header__hubs">
               <span className="profile-header__games-label">Communities:</span>
               {profileUser.joinedHubs.map((hub) => (
                 <Link
-                  key={hub.slug ?? hub}
-                  to={`/hub/${hub.slug ?? hub.toLowerCase().replace(/\s+/g, '-')}`}
+                  key={hub._id ?? hub}
+                  to={`/hub/${hub.slug}`}
                   className="badge badge-info"
                 >
-                  h/{hub.name ?? hub}
+                  h/{hub.name}
                 </Link>
               ))}
             </div>
@@ -452,15 +563,15 @@ function UserProfilePage() {
       {/* ---- Edit profile form (own profile only) ---- */}
       {isOwnProfile && editMode && (
         <EditProfileForm
-          user={profileUser}
+          profileUser={profileUser}
           onSave={handleEditSave}
           onCancel={() => setEditMode(false)}
         />
       )}
 
-      {/* 29.04 Ilia Klodin - fixed major privacy issue where Saved tab was visible for other users - critical user experience and privacy failrue */}
+      {/* 29.04 Ilia Klodin - fixed major privacy issue where Saved tab was visible for other users - critical user experience and privacy failure */}
       <div className="profile-tabs" role="tablist" aria-label="Profile sections">
-        {(['posts', 'comments', ...(isOwnProfile ? ['saved'] : []), 'activity']).map((tab) => (
+        {(['posts', 'comments', ...(isOwnProfile ? ['saved'] : [])]).map((tab) => (
           <button
             key={tab}
             role="tab"

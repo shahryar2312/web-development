@@ -25,8 +25,9 @@ const registerRules = [
     .withMessage('Password must contain at least one uppercase letter, one lowercase letter, and one number'),
 ];
 
+// 04.05 Ilia Klodin: relaxed login validation to accept username too not just a valid email format
 const loginRules = [
-  body('email').isEmail().withMessage('Valid email required').normalizeEmail(),
+  body('email').notEmpty().trim().withMessage('Email or username required'),
   body('password').notEmpty().withMessage('Password required'),
 ];
 

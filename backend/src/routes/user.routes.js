@@ -6,6 +6,7 @@ const { getUser, updateMe, updatePassword, getUserPosts, getUserComments, getAll
 const { protect, adminOnly } = require('../middleware/auth');
 const { param } = require('express-validator');
 const validateRequest = require('../middleware/validateRequest');
+const upload = require('../middleware/uploadUtility');
 
 const updateMeRules = [
   body('bio').optional().isLength({ max: 500 }).withMessage('Bio cannot exceed 500 characters'),
@@ -32,7 +33,10 @@ router.patch('/:userId/ban',         protect, adminOnly, validateUserId, validat
 router.patch('/:userId/role',        protect, adminOnly, validateUserId, validateRequest, updateUserRole);
 
 // /me routes must come before /:username so they aren't consumed as a username lookup
-router.put('/me',          protect, updateMeRules,       validateRequest, updateMe);
+// upload.single('avatar') is a no-op for JSON requests; activates only on multipart/form-data
+router.put('/me',          protect, upload.single('avatar'), updateMeRules, validateRequest, updateMe);
+// 01.05 Ilia Klodin: dedicated avatar route so multipart upload doesnt go through the full updateMe validation, otherwise couldn't just update the avatar without also sending all the other fields fopr some reason
+router.put('/me/avatar',   protect, upload.single('avatar'), updateMe);
 router.put('/me/password', protect, updatePasswordRules, validateRequest, updatePassword);
 router.get('/:username',             getUser);
 router.get('/:username/posts',       getUserPosts);

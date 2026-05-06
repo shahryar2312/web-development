@@ -31,17 +31,17 @@ const buildFilter = ({ hubId, platform, skillLevel, status, region, voiceChat, g
  * @access  Public
  */
 const getGlobalLFG = asyncHandler(async (req, res) => {
-  const { page = 1, game, platform, skillLevel, status = 'open' } = req.query;
+  const { page = 1, game, platform, skillLevel, region, status = 'open' } = req.query;
 
   let hubFilter = {};
   if (game) {
-    // In search, using text search is better. 
-    // For now keeping simple regex but optimized with Hub.find.
+    // In search, using text search is better.
+    // For now keeping simple regex but optimised with Hub.find.
     const hubs = await Hub.find({ game: { $regex: game, $options: 'i' } }).select('_id');
     hubFilter = { hub: { $in: hubs.map((h) => h._id) } };
   }
 
-  const filter = { ...buildFilter({ platform, skillLevel, status }), ...hubFilter };
+  const filter = { ...buildFilter({ platform, skillLevel, region, status }), ...hubFilter };
 
   const [posts, total] = await Promise.all([
     Post.find(filter)

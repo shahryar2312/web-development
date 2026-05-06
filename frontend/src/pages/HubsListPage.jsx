@@ -1,35 +1,41 @@
 /**
  * 28.04 Ilia Klodin: added a hubs list page with search and sort functionality.
  * Maps to backend: GET /api/hubs?search=<q>&sort=<sort>&page=<page>
+ *
+ * previously used mock data for visualization purposes — now comes from the backend
  */
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import HubCard from '../components/HubCard';
+import { api } from '../services/api';
 import './HubsListPage.css';
 
-const MOCK_HUBS = [ // some mock data for now for visualization purposes. later no should come from the backend
-  { _id: 'h1', name: 'Valorant',   slug: 'valorant',   game: 'Valorant',         memberCount: 48200, description: 'The #1 hub for Valorant players. Tips, clips, and team-ups.' },
-  { _id: 'h2', name: 'Minecraft',  slug: 'minecraft',  game: 'Minecraft',        memberCount: 91000, description: 'Build, survive, and explore with fellow Minecrafters.' },
-  { _id: 'h3', name: 'FIFA25',     slug: 'fifa25',     game: 'EA Sports FC 25',  memberCount: 32100, description: 'Ultimate Team squads, trade tips, and match clips.' },
-  { _id: 'h4', name: 'Elden Ring', slug: 'elden-ring', game: 'Elden Ring',       memberCount: 27500, description: 'Lore, builds, and co-op for Tarnished everywhere.' },
-  { _id: 'h5', name: 'CSGO2',      slug: 'csgo2',      game: 'Counter-Strike 2', memberCount: 54300, description: 'Strategy, clips, and team-find for CS2 players.' },
-];
-
 function HubsListPage() {
-  const [search, setSearch] = useState('');
-  const [sort,   setSort]   = useState('popular');
+  const [hubs,    setHubs]    = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error,   setError]   = useState('');
+  const [search,  setSearch]  = useState('');
+  const [sort,    setSort]    = useState('popular');
 
-  const filteredHubs = useMemo(() => {
-    let result = [...MOCK_HUBS];
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      result = result.filter(h =>
-        h.name.toLowerCase().includes(q) || h.game.toLowerCase().includes(q)
-      );
+  const fetchHubs = useCallback(async (searchTerm, sortOrder) => {
+    setLoading(true);
+    setError('');
+    try {
+      const params = new URLSearchParams({ sort: sortOrder });
+      if (searchTerm.trim()) params.set('search', searchTerm.trim());
+      const data = await api.get(`/api/hubs?${params}`);
+      setHubs(data.hubs || []);
+    } catch (err) {
+      setError('Failed to load hubs. Please try again.');
+    } finally {
+      setLoading(false);
     }
-    if (sort === 'popular') result.sort((a, b) => b.memberCount - a.memberCount);
-    if (sort === 'name')    result.sort((a, b) => a.name.localeCompare(b.name));
-    return result;
-  }, [search, sort]);
+  }, []);
+
+  // Debounce search so we don't hammer the API on every keystroke
+  useEffect(() => {
+    const timer = setTimeout(() => fetchHubs(search, sort), 300);
+    return () => clearTimeout(timer);
+  }, [search, sort, fetchHubs]);
 
   return (
     <div className="container hubs-list-page">
@@ -62,14 +68,18 @@ function HubsListPage() {
         </div>
       </div>
 
-      {filteredHubs.length === 0 ? (
+      {loading ? (
+        <div className="empty-state"><p>Loading hubs…</p></div>
+      ) : error ? (
+        <div className="alert alert-error">{error}</div>
+      ) : hubs.length === 0 ? (
         <div className="empty-state">
           <h3>No hubs match your search</h3>
           <p>Try a different search term.</p>
         </div>
       ) : (
         <div className="hubs-list-page__grid">
-          {filteredHubs.map(hub => <HubCard key={hub._id} hub={hub} />)}
+          {hubs.map(hub => <HubCard key={hub._id} hub={hub} />)}
         </div>
       )}
     </div>

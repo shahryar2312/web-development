@@ -11,6 +11,7 @@
  */
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { api } from '../services/api';
 import './AuthPage.css';
 
 function ForgotPasswordPage() {
@@ -40,24 +41,14 @@ function ForgotPasswordPage() {
 
     setLoading(true);
     // --- for backend integration later on, NEEDS PROPER INTEGRATION TESTING !!!! ---
-    /* 
-     * const res = await fetch('/api/auth/forgotpassword', {
-     *   method: 'POST',
-     *   headers: { 'Content-Type': 'application/json' },
-     *   body: JSON.stringify({ email }),
-     * });
-     * if (!res.ok) {
-     *   const data = await res.json();
-     *   setServerError(data.message || 'Something went wrong. Please try again.');
-     *   setLoading(false);
-     *   return;
-     * }
-     */
-
-    // Mock: simulate a short delay then show success
-    await new Promise((r) => setTimeout(r, 800));
-    setLoading(false);
-    setSubmitted(true);
+    try {
+      await api.post('/api/auth/forgotpassword', { email });
+      setSubmitted(true);
+    } catch (err) {
+      setServerError(err.message || 'Something went wrong. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

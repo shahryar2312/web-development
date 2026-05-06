@@ -13,71 +13,35 @@
  *   Vote post   — POST /api/posts/:postId/vote      { value: 1|-1 }
  *   Vote comment— POST /api/comments/:commentId/vote { value: 1|-1 }
  */
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { api } from '../services/api';
 import './PostDetailPage.css';
 
 /* ------------------------------------------------------------------ */
-/* Mock Data                                                            */
+/* Helpers                                                              */
 /* ------------------------------------------------------------------ */
 
-const MOCK_POSTS = {
-  p1: {
-    _id: 'p1',
-    title: 'My first Platinum in Elden Ring after 200 hours — worth every second!',
-    content: `Finally did it. Malenia was the final boss I needed and it only took me 87 attempts.
-
-The trick that finally worked: Bloodhound's Step to dodge Scarlet Rot, Rivers of Blood bleed build,
-and just... patience. Lots of patience.
-
-Best gaming achievement of my life. AMA!`,
-    type: 'text',
-    voteScore: 4821,
-    commentCount: 3,
-    tags: ['achievement', 'platinum', 'malenia'],
-    isPinned: false,
-    isLocked: false,
-    author:    { username: 'tarnished_one' },
-    hub:       { _id: 'h4', name: 'Elden Ring', slug: 'elden-ring' },
-    createdAt: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
-  },
-  vp1: {
-    _id: 'vp1',
-    title: 'Immortal 3 → Radiant in 2 weeks — here is my full routine',
-    content: `I peaked Immortal 3 for two acts and was about to give up on Radiant. Here is the routine that finally worked:
-
-1. 30 min Aim Lab every morning (Gridshot, Strafetrack, Sidetrack)
-2. 1 hour deathmatch — no peeking, just cleaning up aim
-3. Watch 1 full VCT game per day focusing on positioning
-4. Ranked only when mentally fresh
-
-Agent: Mainly Jett, switched to Chamber for the last push.
-
-Feel free to ask questions!`,
-    type: 'text',
-    voteScore: 3402,
-    commentCount: 2,
-    tags: ['ranked', 'guide', 'radiant'],
-    isPinned: true,
-    isLocked: false,
-    author:    { username: 'RadiantCoach' },
-    hub:       { _id: 'h1', name: 'Valorant', slug: 'valorant' },
-    createdAt: new Date(Date.now() - 3 * 3600 * 1000).toISOString(),
-  },
-};
-
-const MOCK_COMMENTS = {
-  p1: [
-    { _id: 'c1', content: 'Congrats! 87 attempts on Malenia is actually pretty good. Most people take 150+', voteScore: 342, author: { username: 'BossRushFan' }, parent: null, depth: 0, createdAt: new Date(Date.now() - 90 * 60 * 1000).toISOString() },
-    { _id: 'c2', content: 'Which ending did you go for? I always do Age of Stars first run.', voteScore: 89,  author: { username: 'LoreNerd42'  }, parent: null, depth: 0, createdAt: new Date(Date.now() - 60 * 60 * 1000).toISOString() },
-    { _id: 'c3', content: 'Same! The music when you finally beat her is 🔥', voteScore: 201, author: { username: 'SoundtrackFan' }, parent: 'c1', depth: 1, createdAt: new Date(Date.now() - 45 * 60 * 1000).toISOString() },
-  ],
-  vp1: [
-    { _id: 'c4', content: 'This is exactly what I needed. Bookmarked. Do you recommend any specific Aim Lab playlist?', voteScore: 128, author: { username: 'SilverStruggle' }, parent: null, depth: 0, createdAt: new Date(Date.now() - 2 * 3600 * 1000).toISOString() },
-    { _id: 'c5', content: 'ValorantAim default + Strafetrack 180. Start at 60% speed.', voteScore: 77, author: { username: 'RadiantCoach' }, parent: 'c4', depth: 1, createdAt: new Date(Date.now() - 100 * 60 * 1000).toISOString() },
-  ],
-};
+// 03.05 Ilia Klodin: backend comment endpoint now supports flat=true param, needed client-side tree builder
+/**
+ * buildCommentTree — Converts a flat array of comments (each with a .parent
+ * field) into a nested tree structure for rendering.
+ * Called with the flat=true response from GET /api/posts/:postId/comments.
+ */
+function buildCommentTree(flatComments) {
+  const byId  = {};
+  const roots = [];
+  flatComments.forEach((c) => { byId[c._id] = { ...c, replies: [] }; });
+  flatComments.forEach((c) => {
+    if (c.parent && byId[c.parent]) {
+      byId[c.parent].replies.push(byId[c._id]);
+    } else {
+      roots.push(byId[c._id]);
+    }
+  });
+  return roots;
+}
 
 /* ------------------------------------------------------------------ */
 /* CommentItem sub-component                                            */
@@ -88,30 +52,60 @@ const MOCK_COMMENTS = {
  * Indented based on comment.depth for nested replies.
  *
  * Props:
- *   comment {object} — comment document
+ *   comment     {object}   — comment document
+ *   postId      {string}   — parent post id (needed for reply submission)
+ *   isLocked    {boolean}  — whether the post is locked (hides reply form)
+ *   onReplyAdded {function} — callback to splice a new reply into the tree
  */
-function CommentItem({ comment }) {
-  const { isLoggedIn } = useAuth();
-  const [score, setScore]     = useState(comment.voteScore);
-  const [userVote, setUserVote] = useState(0);
+function CommentItem({ comment, postId, isLocked, onReplyAdded }) {
+  const { isLoggedIn, user } = useAuth();
+  const [score,      setScore]      = useState(comment.voteScore ?? 0);
+  const [userVote,   setUserVote]   = useState(comment.userVote ?? 0);
+  const [showReply,  setShowReply]  = useState(false);
+  const [replyText,  setReplyText]  = useState('');
+  const [replyError, setReplyError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   /**
    * handleVote — Upvotes or downvotes a comment.
    * Maps to: POST /api/comments/:commentId/vote  { value }
    */
-  const handleVote = (val) => {
+  const handleVote = async (val) => {
     if (!isLoggedIn) { alert('Please log in to vote.'); return; }
-    /*
-     * --- BACKEND INTEGRATION POINT ---
-     * fetch(`/api/comments/${comment._id}/vote`, {
-     *   method: 'POST',
-     *   headers: { 'Content-Type': 'application/json' },
-     *   credentials: 'include',
-     *   body: JSON.stringify({ value: val === userVote ? 0 : val }),
-     * });
-     */
-    if (val === userVote) { setScore((s) => s - userVote); setUserVote(0); }
-    else { setScore((s) => s - userVote + val); setUserVote(val); }
+    try {
+      // 03.05 Ilia Klodin: was sending value:0 on second click which backend rejects with 400, same value cancels instead
+      const data = await api.post(`/api/comments/${comment._id}/vote`, { value: val });
+      setScore(data.voteScore);
+      setUserVote(data.userVote);
+    } catch (err) {
+      console.error('Vote failed:', err.message);
+    }
+  };
+
+  /**
+   * handleReplySubmit — Posts a reply to this comment.
+   * Maps to: POST /api/posts/:postId/comments  { content, parent }
+   */
+  const handleReplySubmit = async (e) => {
+    e.preventDefault();
+    const trimmed = replyText.trim();
+    if (!trimmed) { setReplyError('Reply cannot be empty.'); return; }
+    if (trimmed.length > 10000) { setReplyError('Reply cannot exceed 10,000 characters.'); return; }
+
+    setSubmitting(true);
+    try {
+      const data = await api.post(`/api/posts/${postId}/comments`, {
+        content: trimmed,
+        parent:  comment._id,
+      });
+      onReplyAdded(comment._id, { ...data.comment, replies: [] });
+      setReplyText('');
+      setShowReply(false);
+    } catch (err) {
+      setReplyError(err.message);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const formatDate = (iso) => {
@@ -125,7 +119,7 @@ function CommentItem({ comment }) {
   return (
     <div
       className="comment"
-      style={{ marginLeft: `${comment.depth * 24}px` }}
+      style={{ marginLeft: `${Math.min(comment.depth, 8) * 24}px` }}
       aria-label={`Comment by ${comment.author?.username}`}
     >
       <div className="comment__header">
@@ -139,7 +133,48 @@ function CommentItem({ comment }) {
         <button className={`vote-btn vote-btn--up ${userVote === 1 ? 'active' : ''}`} onClick={() => handleVote(1)} aria-label="Upvote comment">▲</button>
         <span className="comment__score">{score}</span>
         <button className={`vote-btn vote-btn--down ${userVote === -1 ? 'active' : ''}`} onClick={() => handleVote(-1)} aria-label="Downvote comment">▼</button>
+        {isLoggedIn && !isLocked && (
+          <button
+            className="comment__reply-btn"
+            onClick={() => setShowReply((p) => !p)}
+          >
+            💬 Reply
+          </button>
+        )}
       </div>
+
+      {showReply && (
+        <form onSubmit={handleReplySubmit} className="comment__reply-form" noValidate>
+          <textarea
+            className={`form-textarea ${replyError ? 'error' : ''}`}
+            rows={3}
+            placeholder={`Reply to u/${comment.author?.username}…`}
+            value={replyText}
+            onChange={(e) => { setReplyText(e.target.value); setReplyError(''); }}
+            maxLength={10000}
+          />
+          {replyError && <span className="field-error" role="alert">{replyError}</span>}
+          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+            <button type="submit" className="btn btn-primary btn-sm" disabled={submitting}>
+              {submitting ? 'Posting…' : 'Post Reply'}
+            </button>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setShowReply(false)}>
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
+
+      {/* Nested replies */}
+      {comment.replies?.map((reply) => (
+        <CommentItem
+          key={reply._id}
+          comment={reply}
+          postId={postId}
+          isLocked={isLocked}
+          onReplyAdded={onReplyAdded}
+        />
+      ))}
     </div>
   );
 }
@@ -149,29 +184,69 @@ function CommentItem({ comment }) {
 /* ------------------------------------------------------------------ */
 
 function PostDetailPage() {
-  const { postId }    = useParams();
+  const { postId }           = useParams();
   const { isLoggedIn, user } = useAuth();
 
-  const post     = MOCK_POSTS[postId];
-  const comments = MOCK_COMMENTS[postId] ?? [];
+  /* Post and comments loaded from the API */
+  const [post,         setPost]         = useState(null);
+  const [commentTree,  setCommentTree]  = useState([]);
+  const [loading,      setLoading]      = useState(true);
+  const [error,        setError]        = useState('');
 
   /* Vote state for the post itself */
-  const [postScore, setPostScore]   = useState(post?.voteScore ?? 0);
-  const [postVote, setPostVote]     = useState(0);
+  const [postScore, setPostScore] = useState(0);
+  const [postVote,  setPostVote]  = useState(0);
 
   /* Comment form state */
-  const [commentText, setCommentText]   = useState('');
-  const [commentError, setCommentError] = useState('');
-  const [commentList, setCommentList]   = useState(comments);
-  const [submitting, setSubmitting]     = useState(false);
+  const [commentText,   setCommentText]   = useState('');
+  const [commentError,  setCommentError]  = useState('');
+  const [submitting,    setSubmitting]    = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
 
+  // 05.05 Ilia Klodin: click-to-expand image viewer, escape key to dismiss
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+
+  useEffect(() => {
+    if (!lightboxOpen) return;
+    const onKey = (e) => { if (e.key === 'Escape') setLightboxOpen(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [lightboxOpen]);
+
+  /* ---- Fetch post and comments on mount / postId change ---- */
+  useEffect(() => {
+    setLoading(true);
+    setError('');
+    Promise.all([
+      api.get(`/api/posts/${postId}`),
+      // 03.05 Ilia Klodin: flat=true fetches all comments in one shot for client-side tree building for nesting
+      api.get(`/api/posts/${postId}/comments?flat=true`),
+    ])
+      .then(([postData, commentsData]) => {
+        setPost(postData.post);
+        setPostScore(postData.post.voteScore ?? 0);
+        setPostVote(postData.post.userVote   ?? 0);
+        setCommentTree(buildCommentTree(commentsData.comments || []));
+      })
+      .catch(() => setError('Post not found or failed to load.'))
+      .finally(() => setLoading(false));
+  }, [postId]);
+
+  /* Loading / error guards */
+  if (loading) {
+    return (
+      <div className="container empty-state" style={{ marginTop: '4rem' }}>
+        <p>Loading post…</p>
+      </div>
+    );
+  }
+
   /* If post not found */
-  if (!post) {
+  if (error || !post) {
     return (
       <div className="container empty-state" style={{ marginTop: '4rem' }}>
         <h2>Post not found</h2>
-        <p>This post may have been deleted or the link is incorrect.</p>
+        <p>{error || 'This post may have been deleted or the link is incorrect.'}</p>
         <Link to="/" className="btn btn-primary" style={{ marginTop: '1rem' }}>Go Home</Link>
       </div>
     );
@@ -181,10 +256,16 @@ function PostDetailPage() {
    * handlePostVote — Votes on the main post.
    * Maps to: POST /api/posts/:postId/vote  { value }
    */
-  const handlePostVote = (val) => {
+  const handlePostVote = async (val) => {
     if (!isLoggedIn) { alert('Please log in to vote.'); return; }
-    if (val === postVote) { setPostScore((s) => s - postVote); setPostVote(0); }
-    else { setPostScore((s) => s - postVote + val); setPostVote(val); }
+    try {
+      // 03.05 Ilia Klodin: was sending value:0 on second click which backend rejects with 400, same value cancels instead
+      const data = await api.post(`/api/posts/${postId}/vote`, { value: val });
+      setPostScore(data.voteScore);
+      setPostVote(data.userVote);
+    } catch (err) {
+      console.error('Vote failed:', err.message);
+    }
   };
 
   /**
@@ -214,37 +295,38 @@ function PostDetailPage() {
     if (!validateComment()) return;
 
     setSubmitting(true);
+    try {
+      const data = await api.post(`/api/posts/${postId}/comments`, { content: commentText.trim() });
+      // Prepend the new comment to the top of the thread
+      setCommentTree((prev) => [{ ...data.comment, replies: [] }, ...prev]);
+      setCommentText('');
+      setSubmitSuccess(true);
+      // Clear success message after 3 seconds
+      setTimeout(() => setSubmitSuccess(false), 3000);
+    } catch (err) {
+      setCommentError(err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
-    /*
-     * --- BACKEND INTEGRATION POINT ---
-     * const res = await fetch(`/api/posts/${postId}/comments`, {
-     *   method: 'POST',
-     *   headers: { 'Content-Type': 'application/json' },
-     *   credentials: 'include',
-     *   body: JSON.stringify({ content: commentText.trim() }),
-     * });
-     * const data = await res.json();
-     * if (res.ok) { setCommentList((prev) => [data.comment, ...prev]); }
-     */
-
-    // Mock: prepend the new comment to the list
-    const newComment = {
-      _id:       `c-new-${Date.now()}`,
-      content:   commentText.trim(),
-      voteScore: 0,
-      author:    { username: user?.username ?? 'you' },
-      parent:    null,
-      depth:     0,
-      createdAt: new Date().toISOString(),
-    };
-
-    setCommentList((prev) => [newComment, ...prev]);
-    setCommentText('');
-    setSubmitSuccess(true);
-    setSubmitting(false);
-
-    // Clear success message after 3 seconds
-    setTimeout(() => setSubmitSuccess(false), 3000);
+  /**
+   * handleReplyAdded — Splices a newly posted reply into the correct position
+   * in the comment tree without a full refetch.
+   */
+  const handleReplyAdded = (parentId, newReply) => {
+    function insertReply(nodes) {
+      return nodes.map((node) => {
+        if (node._id === parentId) {
+          return { ...node, replies: [newReply, ...(node.replies || [])] };
+        }
+        if (node.replies?.length) {
+          return { ...node, replies: insertReply(node.replies) };
+        }
+        return node;
+      });
+    }
+    setCommentTree((prev) => insertReply(prev));
   };
 
   const formatDate = (iso) => {
@@ -257,6 +339,11 @@ function PostDetailPage() {
 
   const typeBadgeMap = { text: { label: 'Text', cls: 'badge-info' }, image: { label: 'Image', cls: 'badge-success' }, link: { label: 'Link', cls: 'badge-warning' }, lfg: { label: 'LFG', cls: 'badge-primary' } };
   const badge = typeBadgeMap[post.type] ?? typeBadgeMap.text;
+
+  // Count all comments including nested replies for the section heading
+  const totalComments = (function count(nodes) {
+    return nodes.reduce((acc, n) => acc + 1 + count(n.replies || []), 0);
+  })(commentTree);
 
   return (
     <div className="container">
@@ -311,6 +398,47 @@ function PostDetailPage() {
                   </div>
                 )}
 
+                {/* Image or link URL */}
+                {(post.type === 'image' || post.type === 'link') && post.url && (
+                  <div className="post-detail__url">
+                    {post.type === 'image'
+                      ? <button className="post-detail__image-btn" onClick={() => setLightboxOpen(true)} aria-label="View full image">
+                          <img src={post.url} alt="Post image" className="post-detail__image" />
+                        </button>
+                      : <a href={post.url} target="_blank" rel="noopener noreferrer" className="post-card__link">🔗 {post.url}</a>
+                    }
+                  </div>
+                )}
+
+                {/* 05.05 Ilia Klodin: fullscreen overlay, click backdrop or X to close */}
+                {lightboxOpen && (
+                  <div className="lightbox" role="dialog" aria-modal="true" aria-label="Image viewer" onClick={() => setLightboxOpen(false)}>
+                    <button className="lightbox__close" aria-label="Close image viewer">✕</button>
+                    <img
+                      src={post.url}
+                      alt="Post image"
+                      className="lightbox__img"
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  </div>
+                )}
+
+                {/* LFG details block */}
+                {post.lfgDetails && post.type === 'lfg' && (
+                  <div className="lfg-card__details" style={{ marginTop: '1rem' }}>
+                    {post.lfgDetails.platform    && <div className="lfg-detail"><span className="lfg-detail__key">Platform</span><span className="lfg-detail__val">{post.lfgDetails.platform}</span></div>}
+                    {post.lfgDetails.region      && <div className="lfg-detail"><span className="lfg-detail__key">Region</span><span className="lfg-detail__val">{post.lfgDetails.region}</span></div>}
+                    {post.lfgDetails.skillLevel  && <div className="lfg-detail"><span className="lfg-detail__key">Skill</span><span className="lfg-detail__val">{post.lfgDetails.skillLevel}</span></div>}
+                    {post.lfgDetails.gameMode    && <div className="lfg-detail"><span className="lfg-detail__key">Mode</span><span className="lfg-detail__val">{post.lfgDetails.gameMode}</span></div>}
+                    {post.lfgDetails.playersNeeded && <div className="lfg-detail"><span className="lfg-detail__key">Spots</span><span className="lfg-detail__val">{post.lfgDetails.playersNeeded - (post.lfgDetails.currentPlayers || 1)} of {post.lfgDetails.playersNeeded} left</span></div>}
+                    {post.lfgDetails.voiceChat !== undefined && <div className="lfg-detail"><span className="lfg-detail__key">Voice</span><span className="lfg-detail__val">{post.lfgDetails.voiceChat ? '🎙 Required' : '🔇 Optional'}</span></div>}
+                    {post.lfgDetails.status      && <div className="lfg-detail"><span className="lfg-detail__key">Status</span><span className={`badge ${post.lfgDetails.status === 'open' ? 'badge-success' : 'badge-danger'}`}>{post.lfgDetails.status}</span></div>}
+                    {post.lfgDetails.schedule    && <p className="lfg-card__extra">🕐 <strong>Schedule:</strong> {post.lfgDetails.schedule}</p>}
+                    {post.lfgDetails.requirements && <p className="lfg-card__extra">📋 <strong>Requirements:</strong> {post.lfgDetails.requirements}</p>}
+                    {post.lfgDetails.contactInfo  && <p className="lfg-card__extra">📩 <strong>Contact:</strong> {post.lfgDetails.contactInfo}</p>}
+                  </div>
+                )}
+
                 {/* Tags */}
                 {post.tags?.length > 0 && (
                   <div className="post-card__tags">
@@ -324,12 +452,12 @@ function PostDetailPage() {
           {/* ---- Comment form ---- */}
           <section className="comment-form-section" aria-label="Add a comment">
             <h2 className="comment-form-section__title">
-              💬 {commentList.length} Comment{commentList.length !== 1 ? 's' : ''}
+              💬 {totalComments} Comment{totalComments !== 1 ? 's' : ''}
             </h2>
 
             {post.isLocked ? ( /* ---- 28.04 Ilia Klodin -added post locked state in light of expanded admin-mod functionality----- */
                               /* previously the comment form was still present for locked posts, which made 0 sense */
-              <div className="comment-form__guest card"> 
+              <div className="comment-form__guest card">
                 <p>🔒 This post has been locked by a moderator. No new comments can be added.</p>
               </div>
             ) : isLoggedIn ? (
@@ -380,13 +508,21 @@ function PostDetailPage() {
 
           {/* ---- Comment thread ---- */}
           <section className="comment-thread" aria-label="Comments">
-            {commentList.length === 0 ? (
+            {commentTree.length === 0 ? (
               <div className="empty-state">
                 <h3>No comments yet</h3>
                 <p>Be the first to share your thoughts!</p>
               </div>
             ) : (
-              commentList.map((c) => <CommentItem key={c._id} comment={c} />)
+              commentTree.map((c) => (
+                <CommentItem
+                  key={c._id}
+                  comment={c}
+                  postId={postId}
+                  isLocked={post.isLocked}
+                  onReplyAdded={handleReplyAdded}
+                />
+              ))
             )}
           </section>
         </article>

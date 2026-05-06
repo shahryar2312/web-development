@@ -14,6 +14,7 @@
  * fully functional without a running backend.
  */
 import React, { createContext, useState, useContext, useCallback, useEffect } from 'react';
+import { api } from '../services/api';
 
 /* ---------- Context creation ---------- */
 const AuthContext = createContext(null);
@@ -52,8 +53,8 @@ export function AuthProvider({ children }) {
      * restore the logged-in state without asking for credentials again.
      * while we're just mocking this, for now this silntly fails and user stays as null (guest).
      */
-    fetch('/api/auth/me', { credentials: 'include' })
-      .then((res) => (res.ok ? res.json() : null))
+    // 02.05 Ilia Klodin: switched from raw fetch to api.js here — raw fetch wasn't unwrapping the envelope so data.user was always undefined
+    api.get('/api/auth/me')
       .then((data) => { if (data?.user) setUser(data.user); })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -72,36 +73,11 @@ export function AuthProvider({ children }) {
   const login = useCallback(async (email, password) => {
     setLoading(true);
     try {
-      /*
-       * --- BACKEND INTEGRATION POINT ---
-       * const res = await fetch('/api/auth/login', {
-       *   method: 'POST',
-       *   headers: { 'Content-Type': 'application/json' },
-       *   credentials: 'include',          // send session cookie
-       *   body: JSON.stringify({ email, password }),
-       * });
-       * const data = await res.json();
-       * if (!res.ok) return { success: false, error: data.message };
-       * setUser(data.user);
-       * return { success: true };
-       */
-
-      // Mock: accept any credentials and return a fake user object
-      const isAdmin = email.toLowerCase() === 'admin@gamerhub.com';
-      const mockUser = {
-        _id:      isAdmin ? 'mock-admin-id-001' : 'mock-user-id-001',
-        username: email.split('@')[0],
-        email,
-        avatar:   '',
-        bio:      isAdmin ? 'Platform Administrator' : 'Gaming enthusiast',
-        role:     isAdmin ? 'admin' : 'user',
-        joinedHubs:    [],
-        favoriteGames: ['Valorant', 'Minecraft'],
-      };
-      setUser(mockUser);
+      const data = await api.post('/api/auth/login', { email, password });
+      setUser(data.user);
       return { success: true };
     } catch (err) {
-      return { success: false, error: 'Network error. Please try again.' };
+      return { success: false, error: err.message };
     } finally {
       setLoading(false);
     }
@@ -119,35 +95,11 @@ export function AuthProvider({ children }) {
   const register = useCallback(async (username, email, password) => {
     setLoading(true);
     try {
-      /*
-       * --- BACKEND INTEGRATION POINT ---
-       * const res = await fetch('/api/auth/register', {
-       *   method: 'POST',
-       *   headers: { 'Content-Type': 'application/json' },
-       *   credentials: 'include',
-       *   body: JSON.stringify({ username, email, password }),
-       * });
-       * const data = await res.json();
-       * if (!res.ok) return { success: false, error: data.message };
-       * setUser(data.user);
-       * return { success: true };
-       */
-
-      // Mock: create and store a fake user immediately
-      const mockUser = {
-        _id:      'mock-user-id-002',
-        username,
-        email,
-        avatar:   '',
-        bio:      '',
-        role:     'user',
-        joinedHubs:    [],
-        favoriteGames: [],
-      };
-      setUser(mockUser);
+      const data = await api.post('/api/auth/register', { username, email, password });
+      setUser(data.user);
       return { success: true };
     } catch (err) {
-      return { success: false, error: 'Network error. Please try again.' };
+      return { success: false, error: err.message };
     } finally {
       setLoading(false);
     }
@@ -158,14 +110,24 @@ export function AuthProvider({ children }) {
    * Maps to: POST /api/auth/logout
    */
   const logout = useCallback(async () => {
-    /*
-     * --- BACKEND INTEGRATION POINT ---
-     * await fetch('/api/auth/logout', {
-     *   method: 'POST',
-     *   credentials: 'include',
-     * });
-     */
+    await api.post('/api/auth/logout');
     setUser(null);
+  }, []);
+
+  /**
+   * refreshUser — Re-fetches the current user from the server.
+   * Called after a successful profile update so the navbar etc. reflects
+   * changes immediately without a full page reload.
+   * Maps to: GET /api/auth/me
+   */
+  // 02.05 Ilia Klodin: needed so profile edits (avatar, username) reflect everywhere instantly without reload
+  const refreshUser = useCallback(async () => {
+    try {
+      const data = await api.get('/api/auth/me');
+      if (data?.user) setUser(data.user);
+    } catch {
+      // silently ignore so user doesnt get logged out
+    }
   }, []);
 
   /* Values exposed to every child component */
@@ -176,6 +138,7 @@ export function AuthProvider({ children }) {
     login,
     register,
     logout,
+    refreshUser,
   };
 
   return (

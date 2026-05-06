@@ -2,7 +2,7 @@
  * LoginPage.jsx — View 2a: User login form
  *
  * Performs full client-side validation before submission:
- *   - Email must be a valid email format
+ *   - Email or username must not be empty
  *   - Password must not be empty
  *
  * On submit, calls AuthContext.login() which maps to:
@@ -63,11 +63,9 @@ function LoginPage() {
   const validate = () => {
     const newErrors = {};
 
-    // Email: required + format check
+    // Email or username: required
     if (!formData.email.trim()) {
-      newErrors.email = 'Email is required.';
-    } else if (!/^\S+@\S+\.\S+$/.test(formData.email)) {
-      newErrors.email = 'Please enter a valid email address.';
+      newErrors.email = 'Email or username is required.';
     }
 
     // Password: required
@@ -123,18 +121,18 @@ function LoginPage() {
         {/* ---- Login form ---- */}
         <form onSubmit={handleSubmit} noValidate aria-label="Login form">
 
-          {/* Email */}
+          {/* Email or username */}
           <div className="form-group">
-            <label className="form-label" htmlFor="login-email">Email address</label>
+            <label className="form-label" htmlFor="login-email">Email or Username</label>
             <input
               id="login-email"
-              type="email"
+              type="text"
               name="email"
               className={`form-input ${errors.email ? 'error' : ''}`}
-              placeholder="you@example.com"
+              placeholder="you@example.com or your username"
               value={formData.email}
               onChange={handleChange}
-              autoComplete="email"
+              autoComplete="username email"
               aria-required="true"
               aria-describedby={errors.email ? 'login-email-error' : undefined}
             />

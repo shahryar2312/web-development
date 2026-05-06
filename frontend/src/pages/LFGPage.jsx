@@ -6,73 +6,17 @@
  * Includes a "Create LFG Post" form (with full client-side validation).
  *
  * Maps to backend endpoints:
- *   LFG feed   — GET  /api/lfg?platform=<p>&region=<r>&status=open&page=1
+ *   LFG feed   — GET  /api/lfg?platform=<p>&region=<r>&skillLevel=<s>&status=open&page=1
  *   Create LFG — POST /api/hubs/:hubId/posts  { type: 'lfg', title, content, lfgDetails: {...} }
  */
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { api } from '../services/api';
 import './LFGPage.css';
 
-/* ------------------------------------------------------------------ */
-/* Mock Data                                                            */
-/* ------------------------------------------------------------------ */
-
-const MOCK_LFG = [
-  {
-    _id: 'lfg1',
-    title: '[Valorant] Diamond 5-stack — EU servers, weekday evenings',
-    content: 'Looking for 2 players to complete our 5-stack. Must have mic, be positive, and know basics.',
-    voteScore: 45,
-    author:    { username: 'EuroFragger' },
-    hub:       { name: 'Valorant', slug: 'valorant' },
-    createdAt: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
-    lfgDetails: { platform: 'PC', region: 'EU', skillLevel: 'Advanced', playersNeeded: 2, currentPlayers: 3, voiceChat: true, gameMode: 'Ranked', status: 'open', schedule: 'Weekday evenings (GMT)', requirements: 'Diamond+, must have mic', contactInfo: 'DM me on Discord: EuroFragger#1234' },
-  },
-  {
-    _id: 'lfg2',
-    title: '[Minecraft] SMP looking for active builders',
-    content: 'Running a whitelist SMP with 8 people, need 2 more active players who love building.',
-    voteScore: 31,
-    author:    { username: 'CreeperSlayer' },
-    hub:       { name: 'Minecraft', slug: 'minecraft' },
-    createdAt: new Date(Date.now() - 3 * 3600 * 1000).toISOString(),
-    lfgDetails: { platform: 'PC', region: 'Global', skillLevel: 'Intermediate', playersNeeded: 2, currentPlayers: 8, voiceChat: false, gameMode: 'Survival SMP', status: 'open', schedule: 'Weekends', requirements: 'Active player, no griefing', contactInfo: 'Reply here or Discord server' },
-  },
-  {
-    _id: 'lfg3',
-    title: '[CS2] NA Faceit Level 8+ looking for team',
-    content: 'LFM for a serious Faceit team. Practice schedule 3 nights/week.',
-    voteScore: 88,
-    author:    { username: 'awpGod_official' },
-    hub:       { name: 'CSGO2', slug: 'csgo2' },
-    createdAt: new Date(Date.now() - 6 * 3600 * 1000).toISOString(),
-    lfgDetails: { platform: 'PC', region: 'NA', skillLevel: 'Expert', playersNeeded: 3, currentPlayers: 2, voiceChat: true, gameMode: 'Faceit Ranked', status: 'open', schedule: 'Mon/Wed/Fri 8pm EST', requirements: 'Faceit Level 8+, no toxic behaviour', contactInfo: 'Discord: awpGod#9999' },
-  },
-  {
-    _id: 'lfg4',
-    title: '[Elden Ring] Co-op helpers needed — Malenia fight',
-    content: 'Completely lost. Need 2 experienced summons for Malenia. PS5.',
-    voteScore: 12,
-    author:    { username: 'NewTarnished' },
-    hub:       { name: 'Elden Ring', slug: 'elden-ring' },
-    createdAt: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
-    lfgDetails: { platform: 'PlayStation', region: 'EU', skillLevel: 'Beginner', playersNeeded: 2, currentPlayers: 1, voiceChat: false, gameMode: 'Co-op', status: 'open', schedule: 'Now', requirements: 'Just be patient!', contactInfo: 'PSN: NewTarnished_ER' },
-  },
-  {
-    _id: 'lfg5',
-    title: '[Valorant] Unrated fun games — any rank welcome',
-    content: 'Casual 5-stack for unrated. No sweat, just chill and have fun.',
-    voteScore: 24,
-    author:    { username: 'ChillGamer' },
-    hub:       { name: 'Valorant', slug: 'valorant' },
-    createdAt: new Date(Date.now() - 12 * 3600 * 1000).toISOString(),
-    lfgDetails: { platform: 'PC', region: 'NA', skillLevel: 'Any', playersNeeded: 4, currentPlayers: 1, voiceChat: true, gameMode: 'Unrated', status: 'closed', schedule: 'Weekends', requirements: 'None', contactInfo: 'Discord: ChillGamer#0001' },
-  },
-];
-
-const PLATFORMS  = ['All', 'PC', 'PlayStation', 'Xbox', 'Nintendo Switch', 'Mobile', 'Cross-platform'];
-const REGIONS    = ['All', 'NA', 'EU', 'Asia', 'OCE', 'SA', 'Global'];
+const PLATFORMS    = ['All', 'PC', 'PlayStation', 'Xbox', 'Nintendo Switch', 'Mobile', 'Cross-platform'];
+const REGIONS      = ['All', 'NA', 'EU', 'Asia', 'OCE', 'SA', 'Global'];
 const SKILL_LEVELS = ['All', 'Beginner', 'Intermediate', 'Advanced', 'Expert', 'Any'];
 
 /* ------------------------------------------------------------------ */
@@ -91,8 +35,8 @@ function LFGCard({ post }) {
     return `${Math.floor(delta / 86400)}d ago`;
   };
 
-  const d = post.lfgDetails;
-  const spotsLeft = d.playersNeeded - d.currentPlayers;
+  const d = post.lfgDetails || {};
+  const spotsLeft = (d.playersNeeded ?? 0) - (d.currentPlayers ?? 0);
 
   return (
     <article className="lfg-card card">
@@ -105,9 +49,13 @@ function LFGCard({ post }) {
           </span>
         </div>
         <div className="lfg-card__meta">
-          <Link to={`/hub/${post.hub.slug}`} className="lfg-card__hub">h/{post.hub.name}</Link>
-          <span>•</span>
-          <span>u/{post.author.username}</span>
+          {post.hub && (
+            <>
+              <Link to={`/hub/${post.hub.slug}`} className="lfg-card__hub">h/{post.hub.name}</Link>
+              <span>•</span>
+            </>
+          )}
+          <span>u/{post.author?.username}</span>
           <span>•</span>
           <time>{formatDate(post.createdAt)}</time>
         </div>
@@ -127,7 +75,7 @@ function LFGCard({ post }) {
       </div>
 
       {/* Schedule & requirements */}
-      {d.schedule    && <p className="lfg-card__extra">🕐 <strong>Schedule:</strong> {d.schedule}</p>}
+      {d.schedule     && <p className="lfg-card__extra">🕐 <strong>Schedule:</strong> {d.schedule}</p>}
       {d.requirements && <p className="lfg-card__extra">📋 <strong>Requirements:</strong> {d.requirements}</p>}
       {d.contactInfo  && <p className="lfg-card__extra">📩 <strong>Contact:</strong> {d.contactInfo}</p>}
     </article>
@@ -138,42 +86,109 @@ function LFGCard({ post }) {
 /* Main component                                                        */
 /* ------------------------------------------------------------------ */
 
+const initialForm = {
+  title: '', content: '', platform: 'PC', region: 'EU', skillLevel: 'Any',
+  gameMode: '', playersNeeded: '2', voiceChat: false, schedule: '',
+  requirements: '', contactInfo: '', hubId: '',
+};
+
 function LFGPage() {
   const { isLoggedIn, user } = useAuth();
 
   /* ---- Filter state ---- */
-  const [platform,   setPlatform]   = useState('All');
-  const [region,     setRegion]     = useState('All');
-  const [skillLevel, setSkillLevel] = useState('All');
+  const [platform,     setPlatform]     = useState('All');
+  const [region,       setRegion]       = useState('All');
+  const [skillLevel,   setSkillLevel]   = useState('All');
   const [statusFilter, setStatusFilter] = useState('open'); // 'open' | 'closed' | 'all'
 
+  /* ---- Feed state ---- */
+  const [lfgList,     setLfgList]     = useState([]);
+  const [loading,     setLoading]     = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [error,       setError]       = useState('');
+  const [page,        setPage]        = useState(1);
+  const [hasMore,     setHasMore]     = useState(false);
+  const [total,       setTotal]       = useState(0);
+
+  /* ---- Hubs for form selector ---- */
+  const [hubs, setHubs] = useState([]);
+
   /* ---- Create LFG form visibility ---- */
-  const [showForm, setShowForm] = useState(false);
+  const [showForm,   setShowForm]   = useState(false);
 
   /* ---- Create LFG form state ---- */
-  const initialForm = { title: '', content: '', platform: 'PC', region: 'EU', skillLevel: 'Any', gameMode: '', playersNeeded: '2', voiceChat: false, schedule: '', requirements: '', contactInfo: '', hubSlug: 'valorant' };
-  const [formData, setFormData]   = useState(initialForm);
+  const [formData,   setFormData]   = useState(initialForm);
   const [formErrors, setFormErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
 
-  /* ---- LFG list (starts with mock, new posts prepended) ---- */
-  const [lfgList, setLfgList] = useState(MOCK_LFG);
+  /* ---- Load hubs on mount for form selector ---- */
+  // 03.05 Ilia Klodin: needed to populate hub dropdown in the create form
+  useEffect(() => {
+    api.get('/api/hubs?sort=name')
+      .then((data) => {
+        const list = data.hubs || [];
+        setHubs(list);
+        if (list.length > 0) {
+          setFormData((prev) => ({ ...prev, hubId: list[0]._id }));
+        }
+      })
+      .catch(console.error);
+  }, []);
 
   /**
-   * filteredList — Applies active filters to the LFG list.
-   * In full integration these would be query params on GET /api/lfg
+   * buildParams — Builds URLSearchParams from current filter state.
+   * STATUS TRICK: for "all statuses" send ?status= (empty string) so the
+   * backend skips its default 'open'-only filter. If statusFilter === 'all'
+   * we set the param to '' which is falsy on the backend side.
    */
-  const filteredList = useMemo(() => {
-    return lfgList.filter((post) => {
-      const d = post.lfgDetails;
-      if (platform !== 'All'    && d.platform   !== platform)   return false;
-      if (region   !== 'All'    && d.region     !== region)     return false;
-      if (skillLevel !== 'All'  && d.skillLevel !== skillLevel) return false;
-      if (statusFilter !== 'all' && d.status    !== statusFilter) return false;
-      return true;
-    });
-  }, [lfgList, platform, region, skillLevel, statusFilter]);
+  // 03.05 Ilia Klodin: useCallback needed so the filter useEffect can depend on it without causing infinite re-renders
+  const buildParams = useCallback((pageNum) => {
+    const params = new URLSearchParams({ page: pageNum });
+    if (platform   !== 'All') params.set('platform',   platform);
+    if (region     !== 'All') params.set('region',     region);
+    if (skillLevel !== 'All') params.set('skillLevel', skillLevel);
+    // 03.05 Ilia Klodin: sending empty string bypasses backend's default 'open' filter, undefined would trigger the default, 'all' would return no results
+    // empty string bypasses the backend 'open' default, returning all statuses
+    params.set('status', statusFilter === 'all' ? '' : statusFilter);
+    return params;
+  }, [platform, region, skillLevel, statusFilter]);
+
+  /* ---- Re-fetch from page 1 when filters change ---- */
+  // 03.05 Ilia Klodin: re-fetches from page 1 whenever filters change
+  useEffect(() => {
+    setPage(1);
+    setHasMore(false);
+    setLoading(true);
+    setError('');
+
+    api.get(`/api/lfg?${buildParams(1)}`)
+      .then((data) => {
+        setLfgList(data.posts || []);
+        const meta = data._meta;
+        setTotal(meta?.total ?? 0);
+        setHasMore(1 < (meta?.pages ?? 1));
+      })
+      .catch(() => setError('Failed to load LFG posts. Please try again.'))
+      .finally(() => setLoading(false));
+  }, [buildParams]);
+
+  /* ---- Load more (append to list) ---- */
+  // 03.05 Ilia Klodin: appends results rather than replacing, keeps scroll position
+  const handleLoadMore = () => {
+    const nextPage = page + 1;
+    setPage(nextPage);
+    setLoadingMore(true);
+
+    api.get(`/api/lfg?${buildParams(nextPage)}`)
+      .then((data) => {
+        setLfgList((prev) => [...prev, ...(data.posts || [])]);
+        const meta = data._meta;
+        setHasMore(nextPage < (meta?.pages ?? 1));
+      })
+      .catch(() => setError('Failed to load more posts.'))
+      .finally(() => setLoadingMore(false));
+  };
 
   /* ---- Form handlers ---- */
   const handleFormChange = (e) => {
@@ -212,6 +227,10 @@ function LFGPage() {
       errs.contactInfo = 'Contact information is required so players can reach you.';
     }
 
+    if (!formData.hubId) {
+      errs.hubId = 'Please select a hub.';
+    }
+
     setFormErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -227,64 +246,43 @@ function LFGPage() {
 
     setSubmitting(true);
 
-    /*
-     * --- BACKEND INTEGRATION POINT ---
-     * const res = await fetch(`/api/hubs/${selectedHub._id}/posts`, {
-     *   method: 'POST',
-     *   headers: { 'Content-Type': 'application/json' },
-     *   credentials: 'include',
-     *   body: JSON.stringify({
-     *     type: 'lfg',
-     *     title: formData.title,
-     *     content: formData.content,
-     *     lfgDetails: {
-     *       platform: formData.platform,
-     *       region: formData.region,
-     *       skillLevel: formData.skillLevel,
-     *       gameMode: formData.gameMode,
-     *       playersNeeded: parseInt(formData.playersNeeded),
-     *       currentPlayers: 1,
-     *       voiceChat: formData.voiceChat,
-     *       schedule: formData.schedule,
-     *       requirements: formData.requirements,
-     *       contactInfo: formData.contactInfo,
-     *       status: 'open',
-     *     },
-     *   }),
-     * });
-     */
+    try {
+      const data = await api.post(`/api/hubs/${formData.hubId}/posts`, {
+        type: 'lfg',
+        title: formData.title,
+        content: formData.content,
+        lfgDetails: {
+          platform:      formData.platform,
+          region:        formData.region,
+          skillLevel:    formData.skillLevel,
+          gameMode:      formData.gameMode,
+          playersNeeded: parseInt(formData.playersNeeded, 10),
+          currentPlayers: 1,
+          voiceChat:     formData.voiceChat,
+          schedule:      formData.schedule,
+          requirements:  formData.requirements,
+          contactInfo:   formData.contactInfo,
+          status:        'open',
+        },
+      });
 
-    // Mock: prepend to the list
-    const newPost = {
-      _id:        `lfg-new-${Date.now()}`,
-      title:      formData.title,
-      content:    formData.content,
-      voteScore:  0,
-      author:     { username: user?.username ?? 'you' },
-      hub:        { name: formData.hubSlug.charAt(0).toUpperCase() + formData.hubSlug.slice(1), slug: formData.hubSlug },
-      createdAt:  new Date().toISOString(),
-      lfgDetails: {
-        platform:      formData.platform,
-        region:        formData.region,
-        skillLevel:    formData.skillLevel,
-        gameMode:      formData.gameMode,
-        playersNeeded: parseInt(formData.playersNeeded, 10),
-        currentPlayers: 1,
-        voiceChat:     formData.voiceChat,
-        schedule:      formData.schedule,
-        requirements:  formData.requirements,
-        contactInfo:   formData.contactInfo,
-        status:        'open',
-      },
-    };
+      const selectedHub = hubs.find((h) => h._id === formData.hubId);
+      const newPost = {
+        ...data.post,
+        hub: selectedHub ? { name: selectedHub.name, slug: selectedHub.slug } : data.post?.hub,
+      };
 
-    setLfgList((prev) => [newPost, ...prev]);
-    setFormData(initialForm);
-    setSuccessMsg('✅ LFG post created! Other players can now find you.');
-    setShowForm(false);
-    setSubmitting(false);
-
-    setTimeout(() => setSuccessMsg(''), 5000);
+      setLfgList((prev) => [newPost, ...prev]);
+      setTotal((prev) => prev + 1);
+      setFormData({ ...initialForm, hubId: formData.hubId });
+      setSuccessMsg('✅ LFG post created! Other players can now find you.');
+      setShowForm(false);
+      setTimeout(() => setSuccessMsg(''), 5000);
+    } catch (err) {
+      setFormErrors((prev) => ({ ...prev, _submit: err.message }));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -313,6 +311,7 @@ function LFGPage() {
       {showForm && isLoggedIn && (
         <section className="lfg-form-section card" aria-label="Create LFG post form">
           <h2 className="lfg-form-section__title">Create LFG Post</h2>
+          {formErrors._submit && <div className="alert alert-error">{formErrors._submit}</div>}
           <form onSubmit={handleFormSubmit} noValidate>
             <div className="lfg-form__grid">
 
@@ -332,14 +331,14 @@ function LFGPage() {
 
               {/* Hub */}
               <div className="form-group">
-                <label className="form-label" htmlFor="lfg-hub">Hub / Game</label>
-                <select id="lfg-hub" name="hubSlug" className="form-select" value={formData.hubSlug} onChange={handleFormChange}>
-                  <option value="valorant">Valorant</option>
-                  <option value="minecraft">Minecraft</option>
-                  <option value="csgo2">CS2</option>
-                  <option value="elden-ring">Elden Ring</option>
-                  <option value="fifa25">FIFA 25</option>
+                <label className="form-label" htmlFor="lfg-hub">Hub / Game *</label>
+                <select id="lfg-hub" name="hubId" className={`form-select ${formErrors.hubId ? 'error' : ''}`} value={formData.hubId} onChange={handleFormChange}>
+                  {hubs.length === 0 && <option value="">Loading hubs…</option>}
+                  {hubs.map((h) => (
+                    <option key={h._id} value={h._id}>{h.name}</option>
+                  ))}
                 </select>
+                {formErrors.hubId && <span className="field-error" role="alert">{formErrors.hubId}</span>}
               </div>
 
               {/* Platform */}
@@ -449,19 +448,32 @@ function LFGPage() {
           </div>
         </div>
         <p className="lfg-filters__count" aria-live="polite">
-          Showing <strong>{filteredList.length}</strong> of <strong>{lfgList.length}</strong> listings
+          Showing <strong>{lfgList.length}</strong>{total > 0 && ` of ${total}`} listings
         </p>
       </section>
 
       {/* ---- LFG listings ---- */}
       <section className="lfg-list" aria-label="LFG listings">
-        {filteredList.length === 0 ? (
+        {loading ? (
+          <div className="empty-state"><p>Loading LFG posts…</p></div>
+        ) : error ? (
+          <div className="alert alert-error">{error}</div>
+        ) : lfgList.length === 0 ? (
           <div className="empty-state">
             <h3>No LFG posts match your filters</h3>
             <p>Try adjusting the filters above, or be the first to post!</p>
           </div>
         ) : (
-          filteredList.map((post) => <LFGCard key={post._id} post={post} />)
+          <>
+            {lfgList.map((post) => <LFGCard key={post._id} post={post} />)}
+            {hasMore && (
+              <div style={{ textAlign: 'center', marginTop: 'var(--space-4)' }}>
+                <button className="btn btn-secondary" onClick={handleLoadMore} disabled={loadingMore}>
+                  {loadingMore ? 'Loading…' : 'Load more'}
+                </button>
+              </div>
+            )}
+          </>
         )}
       </section>
     </div>

@@ -29,16 +29,19 @@ const register = asyncHandler(async (req, res) => {
 });
 
 /**
- * @desc    Log in with email and password
+ * @desc    Log in with email or username and password
  * @route   POST /api/auth/login
  * @access  Public
  */
 const login = asyncHandler(async (req, res) => {
-  const { email, password } = req.body;
+  const { email: identifier, password } = req.body;
 
-  const user = await User.findOne({ email }).select('+password');
+  // 04.05 Ilia Klodin: added another obvious missing feature - login with the username, not only with email
+  const user = await User.findOne({
+    $or: [{ email: identifier.toLowerCase() }, { username: identifier }],
+  }).select('+password');
   if (!user || !(await user.comparePassword(password))) {
-    return error(res, 'Invalid email or password.', 401);
+    return error(res, 'Invalid email/username or password.', 401);
   }
 
   // 23.04 Ilia Klodin: adding admin functionality - check at auth time if user is banned

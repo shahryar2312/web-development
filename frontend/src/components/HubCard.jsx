@@ -8,71 +8,61 @@
  *   hub {object} — hub document from the backend
  *     { _id, name, slug, game, description, memberCount, icon }
  *
- * Join button maps to:
- *   POST /api/hubs/:hubId/join   (requires auth)
- *   POST /api/hubs/:hubId/leave  (to undo)
+ * Join/leave maps to:
+ *   POST   /api/hubs/:hubId/join   (requires auth) — join the hub
+ *   DELETE /api/hubs/:hubId/join   (requires auth) — leave the hub
  */
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { api } from '../services/api';
 import './HubCard.css';
 
 function HubCard({ hub }) {
-  const { isLoggedIn } = useAuth();
+  const { isLoggedIn, user } = useAuth();
 
-  // Track join state locally; in full integration this checks user.joinedHubs
-  const [joined, setJoined] = useState(false);
+  const [joined,      setJoined]      = useState(false);
   const [memberCount, setMemberCount] = useState(hub.memberCount ?? 0);
+  const [loading,     setLoading]     = useState(false);
 
-  /**
-   * handleJoinToggle — Joins or leaves a hub.
-   * Maps to:
-   *   POST /api/hubs/:hubId/join   { } — join the hub
-   *   POST /api/hubs/:hubId/leave  { } — leave the hub
-   */
-  const handleJoinToggle = (e) => {
-    // Prevent the card click navigating to the hub page
+  // 04.05 Ilia Klodin: keeps "JJoin" button in sync after session restore — without this it always showed "Join" even if already a member
+  // sync join state whenever the auth user updates (e.g. after session restore)
+  useEffect(() => {
+    setJoined(
+      user?.joinedHubs?.some((id) => id.toString() === hub._id.toString()) ?? false
+    );
+  }, [user, hub._id]);
+
+  const handleJoinToggle = async (e) => {
     e.preventDefault();
     e.stopPropagation();
-
-    if (!isLoggedIn) {
-      alert('Please log in to join a hub.');
-      return;
+    if (!isLoggedIn) { alert('Please log in to join a hub.'); return; }
+    if (loading) return;
+    setLoading(true);
+    try {
+      // 04.05 Ilia Klodin: leave uses DELETE /join
+      if (joined) {
+        await api.delete(`/api/hubs/${hub._id}/join`);
+      } else {
+        await api.post(`/api/hubs/${hub._id}/join`);
+      }
+      setJoined((prev) => !prev);
+      setMemberCount((prev) => joined ? prev - 1 : prev + 1);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
     }
-
-    /*
-     * --- BACKEND INTEGRATION POINT ---
-     * const endpoint = joined
-     *   ? `/api/hubs/${hub._id}/leave`
-     *   : `/api/hubs/${hub._id}/join`;
-     *
-     * fetch(endpoint, {
-     *   method: 'POST',
-     *   credentials: 'include',
-     * }).then((res) => {
-     *   if (res.ok) {
-     *     setJoined((prev) => !prev);
-     *     setMemberCount((prev) => joined ? prev - 1 : prev + 1);
-     *   }
-     * });
-     */
-
-    // Optimistic update for demo purposes
-    setJoined((prev) => !prev);
-    setMemberCount((prev) => joined ? prev - 1 : prev + 1);
   };
 
   return (
     <Link to={`/hub/${hub.slug}`} className="hub-card" aria-label={`Go to ${hub.name} hub`}>
-
-      {/* Top row: icon + text */}
       <div className="hub-card__top">
         <div className="hub-card__icon">
-          {hub.icon ? (
-            <img src={hub.icon} alt={`${hub.name} icon`} />
-          ) : (
-            <span>{hub.name.charAt(0).toUpperCase()}</span>
-          )}
+          {hub.icon
+            ? <img src={hub.icon} alt={`${hub.name} icon`} />
+            : <span>{hub.name.charAt(0).toUpperCase()}</span>
+          }
         </div>
 
         <div className="hub-card__info">
@@ -89,13 +79,13 @@ function HubCard({ hub }) {
         </div>
       </div>
 
-      {/* Join / Leave button — sits below, full width */}
       <button
         className={`hub-card__join btn ${joined ? 'btn-secondary' : 'btn-primary'}`}
         onClick={handleJoinToggle}
+        disabled={loading}
         aria-label={joined ? `Leave ${hub.name}` : `Join ${hub.name}`}
       >
-        {joined ? 'Leave' : 'Join'}
+        {loading ? '…' : joined ? 'Leave' : 'Join'}
       </button>
     </Link>
   );

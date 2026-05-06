@@ -27,8 +27,10 @@ const getUser = asyncHandler(async (req, res) => {
  */
 const updateMe = asyncHandler(async (req, res) => {
   const updates = {};
+  // File upload via multer takes precedence over a URL string in the body
+  if (req.file) updates.avatar = req.file.path;
+  else if (req.body.avatar !== undefined) updates.avatar = req.body.avatar;
   if (req.body.bio !== undefined) updates.bio = req.body.bio;
-  if (req.body.avatar !== undefined) updates.avatar = req.body.avatar;
   if (req.body.favoriteGames !== undefined) updates.favoriteGames = req.body.favoriteGames;
 
   const user = await User.findByIdAndUpdate(req.user._id, updates, {

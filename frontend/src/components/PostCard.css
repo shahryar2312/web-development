@@ -111,6 +111,28 @@
   color: var(--color-primary) !important;
 }
 
+/* ---------- Image preview (image-type posts in feed) ---------- */
+.post-card__image-wrap {
+  display: block;
+  margin-bottom: var(--space-2);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  max-height: 320px;
+}
+
+.post-card__image {
+  width: 100%;
+  max-height: 320px;
+  object-fit: cover;
+  display: block;
+  transition: opacity 0.2s ease;
+}
+
+.post-card__image-wrap:hover .post-card__image {
+  opacity: 0.88;
+}
+
+/* ---------- Text preview ---------- */
 .post-card__preview {
   font-size: var(--fs-sm);
   color: var(--color-text-muted);

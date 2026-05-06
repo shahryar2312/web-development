@@ -2,7 +2,7 @@ const cloudinary = require('cloudinary').v2;
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const multer = require('multer');
 
-// Cloudinary automatically picks up CLOUDINARY_URL from the environment variables.
+// Cloudinary auto-configures from the CLOUDINARY_URL environment variable.
 
 // Configure Storage
 const storage = new CloudinaryStorage({

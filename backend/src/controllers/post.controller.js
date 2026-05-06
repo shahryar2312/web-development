@@ -199,4 +199,39 @@ const lockPost = asyncHandler(async (req, res) => {
   return success(res, { post });
 });
 
-module.exports = { getHubPosts, createPost, getPost, updatePost, deletePost, votePost, lockPost };
+/**
+ * @desc    Global post feed across all hubs (for the home page)
+ * @route   GET /api/posts
+ * @access  Public
+ */
+// 01.05 Ilia Klodin: home page needed a cross-hub feed not just per-hub posts so added global endpoint
+const getGlobalPosts = asyncHandler(async (req, res) => {
+  const { page = 1, sort = 'new' } = req.query;
+
+  const sortMap = {
+    new: { createdAt: -1 },
+    hot: { voteScore: -1, createdAt: -1 },
+    top: { voteScore: -1 },
+  };
+
+  const [posts, total] = await Promise.all([
+    Post.find()
+      .populate('author', 'username avatar')
+      .populate('hub', 'name slug icon')
+      .sort(sortMap[sort] || sortMap.new)
+      .skip((page - 1) * PAGE_SIZE)
+      .limit(PAGE_SIZE),
+    Post.countDocuments(),
+  ]);
+
+  const meta = { page: Number(page), limit: PAGE_SIZE, total, pages: Math.ceil(total / PAGE_SIZE) };
+
+  let data = posts;
+  if (req.user) {
+    data = await EngagementService.attachUserVotes(posts, req.user._id, 'Post');
+  }
+
+  return success(res, { posts: data }, 200, meta);
+});
+
+module.exports = { getHubPosts, createPost, getPost, updatePost, deletePost, votePost, lockPost, getGlobalPosts };

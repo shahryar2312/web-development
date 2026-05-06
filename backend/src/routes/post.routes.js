@@ -1,7 +1,7 @@
 const express = require('express');
 const { body, param } = require('express-validator');
 
-const { getHubPosts, createPost, getPost, updatePost, deletePost, votePost, lockPost } = require('../controllers/post.controller');
+const { getHubPosts, createPost, getPost, updatePost, deletePost, votePost, lockPost, getGlobalPosts } = require('../controllers/post.controller');
 const { protect, optionalAuth } = require('../middleware/auth');
 const { voteLimiter } = require('../middleware/rateLimiter');
 const validateRequest = require('../middleware/validateRequest');
@@ -34,6 +34,7 @@ hubPostsRouter.post('/', protect, validateHubId, validateRequest, upload.single(
 
 // Mounted at /api/posts
 const postRouter = express.Router();
+postRouter.get('/',              optionalAuth,            getGlobalPosts);
 postRouter.get('/:postId',       optionalAuth,            getPost);
 postRouter.put('/:postId',       protect,    xssSanitizer, updateRules, validateRequest, updatePost);
 postRouter.delete('/:postId',    protect,                 deletePost);

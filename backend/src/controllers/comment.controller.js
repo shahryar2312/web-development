@@ -14,12 +14,15 @@ const PAGE_SIZE = 50;
  * @access  Public
  */
 const getComments = asyncHandler(async (req, res) => {
-  const { page = 1, sort = 'best', parentId = null } = req.query;
+  const { page = 1, sort = 'best', parentId = null, flat } = req.query;
 
   const post = await Post.findById(req.params.postId);
   if (!post) return error(res, 'Post not found.', 404);
 
-  const filter = { post: post._id, parent: parentId || null };
+  // 01.05 Ilia Klodin: needed flat mode so client can fetch all comments at once and build the tree itself for nesting
+  const filter = { post: post._id };
+  // flat=true returns all comments regardless of depth (used to build the full tree client-side)
+  if (flat !== 'true') filter.parent = parentId || null;
 
   const sortMap = {
     best: { voteScore: -1, createdAt: -1 },
