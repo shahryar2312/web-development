@@ -101,6 +101,7 @@ a {
   color: var(--color-secondary);
   text-decoration: none;
   transition: color var(--transition);
+  word-break: break-word;
 }
 
 a:hover {

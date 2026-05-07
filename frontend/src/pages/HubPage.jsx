@@ -15,21 +15,25 @@
  *   Leave     — DELETE /api/hubs/:hubId/join
  */
 import React, { useState, useEffect } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
+import { useModal } from '../context/ModalContext';
 import PostCard from '../components/PostCard';
 import './HubPage.css';
 
 function HubPage() {
-  const { slug }               = useParams();
-  const { isLoggedIn, user }   = useAuth();
+  const { slug }                            = useParams();
+  const { isLoggedIn, user, refreshUser }   = useAuth();
+  const { showModal }                       = useModal();
+  const navigate                            = useNavigate();
 
   const [hub,         setHub]         = useState(null);
   const [posts,       setPosts]       = useState([]);
   const [loading,     setLoading]     = useState(true);
   const [error,       setError]       = useState('');
   const [sort,        setSort]        = useState('hot');
+  const [searchQuery, setSearchQuery] = useState('');
   const [joined,      setJoined]      = useState(false);
   const [memberCount, setMemberCount] = useState(0);
   const [joinLoading, setJoinLoading] = useState(false);
@@ -43,9 +47,7 @@ function HubPage() {
       .then((data) => {
         setHub(data.hub);
         setMemberCount(data.hub.memberCount ?? 0);
-        return api.get(`/api/hubs/${data.hub._id}/posts?sort=hot`);
       })
-      .then((data) => setPosts(data.posts || []))
       .catch(() => setError('Hub not found.'))
       .finally(() => setLoading(false));
   }, [slug]);
@@ -54,19 +56,27 @@ function HubPage() {
   useEffect(() => {
     if (hub && user) {
       const joined = user.joinedHubs?.some(
-        (id) => id.toString() === hub._id.toString()
+        (h) => (h._id || h).toString() === hub._id.toString()
       );
       setJoined(joined ?? false);
     }
   }, [hub, user]);
 
-  // Re-fetch posts when sort changes (after hub is loaded)
+  // Re-fetch posts when sort or search changes (after hub is loaded)
   useEffect(() => {
     if (!hub) return;
-    api.get(`/api/hubs/${hub._id}/posts?sort=${sort}`)
-      .then((data) => setPosts(data.posts || []))
-      .catch(console.error);
-  }, [sort]); // eslint-disable-line react-hooks/exhaustive-deps
+    
+    const timer = setTimeout(() => {
+      const params = new URLSearchParams({ sort });
+      if (searchQuery.trim()) params.set('search', searchQuery.trim());
+
+      api.get(`/api/hubs/${hub._id}/posts?${params}`)
+        .then((data) => setPosts(data.posts || []))
+        .catch(console.error);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [sort, searchQuery, hub]);
 
   /**
    * handleJoinToggle — Joins or leaves the hub.
@@ -75,22 +85,57 @@ function HubPage() {
    *   DELETE /api/hubs/:hubId/join  (leave)
    */
   const handleJoinToggle = async () => {
-    if (!isLoggedIn) { alert('Please log in to join a hub.'); return; }
-    setJoinLoading(true);
-    try {
-      const method = joined ? 'delete' : 'post';
-      await api[method](`/api/hubs/${hub._id}/join`);
-      setJoined((prev) => !prev);
-      setMemberCount((prev) => joined ? prev - 1 : prev + 1);
-    } catch (err) {
-      alert(err.message);
-    } finally {
-      setJoinLoading(false);
+    if (!isLoggedIn) { showModal({ title: 'Authentication Required', message: 'Please log in to join a hub.', type: 'error' }); return; }
+    
+    const performAction = async (isLeaving) => {
+      setJoinLoading(true);
+      try {
+        const method = isLeaving ? 'delete' : 'post';
+        await api[method](`/api/hubs/${hub._id}/join`);
+        await refreshUser();
+        setJoined((prev) => !prev);
+        setMemberCount((prev) => isLeaving ? prev - 1 : prev + 1);
+      } catch (err) {
+        showModal({ title: 'Error', message: err.message, type: 'error' });
+      } finally {
+        setJoinLoading(false);
+      }
+    };
+
+    if (joined) {
+      showModal({
+        title: 'Leave Hub',
+        message: `Are you sure you want to leave h/${hub.name}?`,
+        type: 'warning',
+        confirmText: 'Leave',
+        cancelText: 'Cancel',
+        onConfirm: () => performAction(true)
+      });
+    } else {
+      performAction(false);
     }
   };
 
   if (loading) return <div className="container empty-state" style={{ marginTop: '4rem' }}><p>Loading hub…</p></div>;
   if (error)   return <div className="container empty-state" style={{ marginTop: '4rem' }}><h2>{error}</h2><Link to="/hubs" className="btn btn-primary" style={{ marginTop: '1rem' }}>Browse Hubs</Link></div>;
+
+  // 07.05 Ilia Klodin: hub staff checks — creator is distinct from mods even though they're also in the mods array
+  const isHubCreator = hub.creator?._id?.toString() === user?._id?.toString();
+  const isHubMod     = hub.moderators?.some(m => m._id?.toString() === user?._id?.toString()) && !isHubCreator;
+  const isAdmin      = user?.role === 'admin';
+  const isStaff      = isHubCreator || isHubMod || isAdmin;
+
+  const handleDeleteHub = () => {
+    showModal({
+      title: 'Delete Hub',
+      message: `Permanently delete h/${hub.name} and all its posts? This cannot be undone.`,
+      type: 'error', confirmText: 'Delete Hub', cancelText: 'Cancel',
+      onConfirm: async () => {
+        try { await api.delete(`/api/hubs/${hub._id}`); navigate('/hubs'); }
+        catch (err) { showModal({ title: 'Error', message: err.message, type: 'error' }); }
+      },
+    });
+  };
 
   return (
     <div>
@@ -135,18 +180,29 @@ function HubPage() {
           <section aria-label={`${hub.name} posts`}>
             <p className="hub-page__desc">{hub.description}</p>
 
-            <div className="feed-controls" style={{ marginBottom: 'var(--space-4)' }}>
-              <span className="feed-controls__label">Sort:</span>
-              {['hot', 'new', 'top'].map((mode) => (
-                <button
-                  key={mode}
-                  className={`feed-controls__btn ${sort === mode ? 'active' : ''}`}
-                  onClick={() => setSort(mode)}
-                  aria-pressed={sort === mode}
-                >
-                  {mode === 'hot' ? '🔥' : mode === 'new' ? '✨' : '🏆'} {mode.charAt(0).toUpperCase() + mode.slice(1)}
-                </button>
-              ))}
+            <div className="feed-controls" style={{ marginBottom: 'var(--space-4)', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+              <input
+                type="search"
+                className="form-input"
+                style={{ flex: 1, minWidth: '200px' }}
+                placeholder={`Search posts in h/${hub.name}...`}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                aria-label="Search posts"
+              />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span className="feed-controls__label">Sort:</span>
+                {['hot', 'new', 'top'].map((mode) => (
+                  <button
+                    key={mode}
+                    className={`feed-controls__btn ${sort === mode ? 'active' : ''}`}
+                    onClick={() => setSort(mode)}
+                    aria-pressed={sort === mode}
+                  >
+                    {mode === 'hot' ? '🔥' : mode === 'new' ? '✨' : '🏆'} {mode.charAt(0).toUpperCase() + mode.slice(1)}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {posts.length === 0 ? (
@@ -186,6 +242,44 @@ function HubPage() {
                 </Link>
               )}
             </div>
+
+            <div className="sidebar__widget">
+              <h2 className="sidebar__title"> Hub Staff</h2>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span className="badge badge-warning" style={{ fontSize: '0.7rem' }}>Owner</span>
+                  <Link to={`/user/${hub.creator.username}`} style={{ fontSize: 'var(--fs-sm)' }}>
+                    u/{hub.creator.username}
+                  </Link>
+                </div>
+                {hub.moderators
+                  .filter(m => m._id?.toString() !== hub.creator._id?.toString())
+                  .map(mod => (
+                    <div key={mod._id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span className="badge badge-info" style={{ fontSize: '0.7rem' }}>Mod</span>
+                      <Link to={`/user/${mod.username}`} style={{ fontSize: 'var(--fs-sm)' }}>
+                        u/{mod.username}
+                      </Link>
+                    </div>
+                  ))
+                }
+              </div>
+            </div>
+
+            {isStaff && (
+              <div className="sidebar__widget">
+                <h2 className="sidebar__title">🛠️ Mod Tools</h2>
+                {(isHubCreator || isAdmin) && (
+                  <button
+                    className="btn btn-secondary sidebar__more"
+                    style={{ color: 'var(--color-danger, #e53e3e)' }}
+                    onClick={handleDeleteHub}
+                  >
+                    Delete Hub
+                  </button>
+                )}
+              </div>
+            )}
 
             {hub.rules?.length > 0 && (
               <div className="sidebar__widget">

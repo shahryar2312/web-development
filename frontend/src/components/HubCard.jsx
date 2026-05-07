@@ -15,11 +15,13 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useModal } from '../context/ModalContext';
 import { api } from '../services/api';
 import './HubCard.css';
 
 function HubCard({ hub }) {
-  const { isLoggedIn, user } = useAuth();
+  const { isLoggedIn, user, refreshUser } = useAuth();
+  const { showModal }        = useModal();
 
   const [joined,      setJoined]      = useState(false);
   const [memberCount, setMemberCount] = useState(hub.memberCount ?? 0);
@@ -29,29 +31,45 @@ function HubCard({ hub }) {
   // sync join state whenever the auth user updates (e.g. after session restore)
   useEffect(() => {
     setJoined(
-      user?.joinedHubs?.some((id) => id.toString() === hub._id.toString()) ?? false
+      user?.joinedHubs?.some((h) => (h._id || h).toString() === hub._id.toString()) ?? false
     );
   }, [user, hub._id]);
 
   const handleJoinToggle = async (e) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!isLoggedIn) { alert('Please log in to join a hub.'); return; }
+    if (!isLoggedIn) { showModal({ title: 'Authentication Required', message: 'Please log in to join a hub.', type: 'error' }); return; }
     if (loading) return;
-    setLoading(true);
-    try {
-      // 04.05 Ilia Klodin: leave uses DELETE /join
-      if (joined) {
-        await api.delete(`/api/hubs/${hub._id}/join`);
-      } else {
-        await api.post(`/api/hubs/${hub._id}/join`);
+
+    const performAction = async (isLeaving) => {
+      setLoading(true);
+      try {
+        if (isLeaving) {
+          await api.delete(`/api/hubs/${hub._id}/join`);
+        } else {
+          await api.post(`/api/hubs/${hub._id}/join`);
+        }
+        await refreshUser();
+        setJoined((prev) => !prev);
+        setMemberCount((prev) => isLeaving ? prev - 1 : prev + 1);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
       }
-      setJoined((prev) => !prev);
-      setMemberCount((prev) => joined ? prev - 1 : prev + 1);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
+    };
+
+    if (joined) {
+      showModal({
+        title: 'Leave Hub',
+        message: `Are you sure you want to leave h/${hub.name}?`,
+        type: 'warning',
+        confirmText: 'Leave',
+        cancelText: 'Cancel',
+        onConfirm: () => performAction(true)
+      });
+    } else {
+      performAction(false);
     }
   };
 
@@ -85,7 +103,7 @@ function HubCard({ hub }) {
         disabled={loading}
         aria-label={joined ? `Leave ${hub.name}` : `Join ${hub.name}`}
       >
-        {loading ? '…' : joined ? 'Leave' : 'Join'}
+        {loading ? '…' : joined ? '✓ Joined' : 'Join'}
       </button>
     </Link>
   );

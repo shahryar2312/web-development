@@ -17,18 +17,20 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useModal } from '../context/ModalContext';
 import { api } from '../services/api';
 import './PostCard.css';
 
 function PostCard({ post }) {
   const { isLoggedIn } = useAuth();
+  const { showModal } = useModal();
 
   const [voteScore, setVoteScore] = useState(post.voteScore ?? 0);
-  const [userVote,  setUserVote]  = useState(post.userVote  ?? 0);
-  const [voting,    setVoting]    = useState(false);
+  const [userVote, setUserVote] = useState(post.userVote ?? 0);
+  const [voting, setVoting] = useState(false);
 
   const handleVote = async (voteValue) => {
-    if (!isLoggedIn) { alert('Please log in to vote.'); return; }
+    if (!isLoggedIn) { showModal({ title: 'Authentication Required', message: 'Please log in to vote.', type: 'error' }); return; }
     if (voting) return;
     setVoting(true);
     try {
@@ -45,17 +47,17 @@ function PostCard({ post }) {
 
   const formatDate = (isoString) => {
     const delta = (Date.now() - new Date(isoString).getTime()) / 1000;
-    if (delta < 60)    return 'just now';
-    if (delta < 3600)  return `${Math.floor(delta / 60)}m ago`;
+    if (delta < 60) return 'just now';
+    if (delta < 3600) return `${Math.floor(delta / 60)}m ago`;
     if (delta < 86400) return `${Math.floor(delta / 3600)}h ago`;
     return `${Math.floor(delta / 86400)}d ago`;
   };
 
   const typeBadgeMap = {
-    text:  { label: 'Text',  cls: 'badge-info' },
+    text: { label: 'Text', cls: 'badge-info' },
     image: { label: 'Image', cls: 'badge-success' },
-    link:  { label: 'Link',  cls: 'badge-warning' },
-    lfg:   { label: 'LFG',   cls: 'badge-primary' },
+    link: { label: 'Link', cls: 'badge-warning' },
+    lfg: { label: 'LFG', cls: 'badge-primary' },
   };
   const badge = typeBadgeMap[post.type] ?? typeBadgeMap.text;
 
@@ -64,17 +66,17 @@ function PostCard({ post }) {
       <div className="post-card__votes">
         <button
           className={`vote-btn vote-btn--up ${userVote === 1 ? 'active' : ''}`}
-          onClick={() => handleVote(1)}
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleVote(1); }}
           disabled={voting}
           aria-label="Upvote"
           title="Upvote"
         >
           ▲
         </button>
-        <span className="vote-btn__score" aria-live="polite">{voteScore}</span>
+        <span className="vote-btn__score" aria-live="polite">{voteScore < 0 ? 0 : voteScore}</span>
         <button
           className={`vote-btn vote-btn--down ${userVote === -1 ? 'active' : ''}`}
-          onClick={() => handleVote(-1)}
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleVote(-1); }}
           disabled={voting}
           aria-label="Downvote"
           title="Downvote"
@@ -89,7 +91,13 @@ function PostCard({ post }) {
             h/{post.hub?.name ?? 'unknown'}
           </Link>
           <span className="post-card__dot">•</span>
-          <span className="post-card__author">u/{post.author?.username ?? 'unknown'}</span>
+          {post.author?.username ? (
+            <Link to={`/user/${post.author.username}`} className="post-card__author-link">
+              u/{post.author.username}
+            </Link>
+          ) : (
+            <span className="post-card__author">u/unknown</span>
+          )}
           <span className="post-card__dot">•</span>
           <time className="post-card__time" dateTime={post.createdAt}>
             {formatDate(post.createdAt)}

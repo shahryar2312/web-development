@@ -41,6 +41,7 @@ export function useAuth() {
 export function AuthProvider({ children }) {
   // null = guest (not logged in), object = authenticated user
   const [user, setUser]       = useState(null);
+  const [activeHub, setActiveHub] = useState(null);
   // true on mount while we check for an existing session cookie
   const [loading, setLoading] = useState(true);
 
@@ -139,6 +140,8 @@ export function AuthProvider({ children }) {
     register,
     logout,
     refreshUser,
+    activeHub,
+    setActiveHub,
   };
 
   return (

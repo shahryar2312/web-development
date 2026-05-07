@@ -10,29 +10,76 @@
  * Uses the AuthContext to show the correct state for guests vs logged-in users.
  * Collapses to a hamburger menu on mobile screens.
  */
-import React, { useState, useEffect } from 'react';
-import { Link, NavLink, useNavigate, useSearchParams } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { Link, NavLink, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useModal } from '../context/ModalContext';
+import useDebounce from '../hooks/useDebounce';
 import './Navbar.css';
 
 function Navbar() {
   // Auth state from context
-  const { user, isLoggedIn, logout } = useAuth();
+  const { user, isLoggedIn, logout, activeHub, setActiveHub } = useAuth();
+  const { showModal } = useModal();
 
   // Controls the mobile hamburger menu visibility
   const [menuOpen, setMenuOpen] = useState(false);
+
+  // Custom dropdown state for hub switcher
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Keep search input in sync with the ?search= URL param so the term
   // stays visible after searching (matches Reddit behaviour)
   const [searchParams]  = useSearchParams();
   const urlSearch       = searchParams.get('search') || '';
+  const navigate = useNavigate();
+  const location = useLocation();
+  const isHubPage = location.pathname.startsWith('/hub/');
+
   const [searchQuery, setSearchQuery] = useState(urlSearch);
+  const debouncedSearch = useDebounce(searchQuery, 500);
 
   useEffect(() => {
     setSearchQuery(urlSearch);
   }, [urlSearch]);
 
-  const navigate = useNavigate();
+  // Auto-navigate when the debounced value changes (and differs from current URL param)
+  useEffect(() => {
+    const trimmed = debouncedSearch.trim();
+    if (trimmed && trimmed !== urlSearch) {
+      navigate(`/?search=${encodeURIComponent(trimmed)}`);
+    } else if (!trimmed && urlSearch) {
+      // User cleared the search — go back to home feed
+      navigate('/');
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearch]);
+
+
+  // Sync activeHub with the URL when browsing a hub
+  useEffect(() => {
+    if (isHubPage && user?.joinedHubs) {
+      const match = location.pathname.match(/^\/hub\/([^/]+)/);
+      const currentSlug = match ? match[1] : null;
+      if (currentSlug) {
+        const joined = user.joinedHubs.find((h) => h.slug === currentSlug);
+        if (joined && activeHub?._id !== (joined._id || joined)) {
+          setActiveHub(joined);
+        }
+      }
+    }
+  }, [location.pathname, user?.joinedHubs, activeHub, setActiveHub, isHubPage]);
 
   /**
    * handleSearch — fires when the user submits the search form.
@@ -54,9 +101,18 @@ function Navbar() {
    * Maps to: POST /api/auth/logout
    */
   const handleLogout = async () => {
-    await logout();
-    setMenuOpen(false);
-    navigate('/');
+    showModal({
+      title: 'Logout',
+      message: 'Are you sure you want to log out?',
+      type: 'warning',
+      confirmText: 'Logout',
+      cancelText: 'Cancel',
+      onConfirm: async () => {
+        await logout();
+        setMenuOpen(false);
+        navigate('/');
+      }
+    });
   };
 
   return (
@@ -87,6 +143,43 @@ function Navbar() {
           <nav className="navbar__links" aria-label="Main navigation">
             <NavLink to="/"    className="navbar__link" end>Home</NavLink>
             <NavLink to="/lfg" className="navbar__link">LFG</NavLink>
+            {isLoggedIn && user?.joinedHubs?.length > 0 && isHubPage && (
+              <div className="navbar__hub-switcher" ref={dropdownRef}>
+                <button
+                  className="navbar__select-btn"
+                  onClick={() => setDropdownOpen(!dropdownOpen)}
+                  aria-haspopup="listbox"
+                  aria-expanded={dropdownOpen}
+                >
+                  <span className="navbar__select-label">
+                    {activeHub ? `h/${activeHub.name}` : 'Switch Hub…'}
+                  </span>
+                  <span className="navbar__select-icon">▼</span>
+                </button>
+                {dropdownOpen && (
+                  <ul className="navbar__dropdown-menu" role="listbox">
+                    {user.joinedHubs.map((hub) => (
+                      <li
+                        key={hub._id || hub}
+                        className={`navbar__dropdown-item ${activeHub?._id === (hub._id || hub) ? 'active' : ''}`}
+                        role="option"
+                        aria-selected={activeHub?._id === (hub._id || hub)}
+                        onClick={() => {
+                          const selected = user.joinedHubs.find((h) => (h._id || h).toString() === (hub._id || hub).toString());
+                          if (selected) {
+                            setActiveHub(selected);
+                            navigate(`/hub/${selected.slug}`);
+                            setDropdownOpen(false);
+                          }
+                        }}
+                      >
+                        h/{hub.name || 'Unknown'}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
             {isLoggedIn && user?.role === 'admin' && (
               <NavLink to="/admin" className="navbar__link" style={{ color: 'var(--color-accent)' }}>Admin Panel</NavLink>
             )}
@@ -107,8 +200,10 @@ function Navbar() {
                   title={`View profile: ${user.username}`}
                   aria-label={`Logged in as ${user.username} — view profile`}
                 >
-                  {/* Show first letter of username as avatar placeholder */}
-                  {user.username.charAt(0).toUpperCase()}
+                  {user.avatar
+                    ? <img src={user.avatar} alt={user.username} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                    : user.username.charAt(0).toUpperCase()
+                  }
                 </Link>
                 <button
                   className="btn btn-secondary"

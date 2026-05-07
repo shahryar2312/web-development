@@ -20,6 +20,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useModal } from '../context/ModalContext';
 import { api } from '../services/api';
 import './UserProfilePage.css';
 
@@ -219,7 +220,8 @@ function EditProfileForm({ profileUser, onSave, onCancel }) {
 
 function UserProfilePage() {
   const { username }           = useParams();
-  const { user: loggedInUser } = useAuth();
+  const { user: loggedInUser, refreshUser, isLoggedIn } = useAuth();
+  const { showModal }          = useModal();
 
   const [profileUser,  setProfileUser]  = useState(null);
   const [loading,      setLoading]      = useState(true);
@@ -230,6 +232,9 @@ function UserProfilePage() {
 
   // Edit mode — only available on own profile
   const [editMode,     setEditMode]     = useState(false);
+  
+  // Follow loading state
+  const [followLoading, setFollowLoading] = useState(false);
 
   /* ---- Posts tab ---- */
   const [posts,        setPosts]        = useState([]);
@@ -343,6 +348,62 @@ function UserProfilePage() {
   const handleEditSave = async () => {
     setEditMode(false);
     await fetchProfile();
+  };
+
+  /**
+   * handleLeaveHub — Leaves a hub and refreshes profile.
+   */
+  const handleLeaveHub = (e, hubId, hubName) => {
+    e.preventDefault();
+    e.stopPropagation();
+    showModal({
+      title: 'Leave Hub',
+      message: `Are you sure you want to leave h/${hubName}?`,
+      type: 'error',
+      confirmText: 'Leave',
+      cancelText: 'Cancel',
+      onConfirm: async () => {
+        try {
+          await api.delete(`/api/hubs/${hubId}/join`);
+          await fetchProfile();
+          await refreshUser();
+        } catch (err) {
+          showModal({ title: 'Error', message: err.message, type: 'error' });
+        }
+      }
+    });
+  };
+
+  /**
+   * handleFollowToggle — Follows or unfollows the profile user.
+   */
+  const handleFollowToggle = async () => {
+    if (!isLoggedIn) {
+      showModal({ title: 'Authentication Required', message: 'Log in to follow users.', type: 'error' });
+      return;
+    }
+    setFollowLoading(true);
+    try {
+      if (profileUser.isFollowing) {
+        await api.delete(`/api/users/${username}/follow`);
+        setProfileUser(prev => ({
+          ...prev,
+          isFollowing: false,
+          followersCount: Math.max(0, prev.followersCount - 1)
+        }));
+      } else {
+        await api.post(`/api/users/${username}/follow`);
+        setProfileUser(prev => ({
+          ...prev,
+          isFollowing: true,
+          followersCount: prev.followersCount + 1
+        }));
+      }
+    } catch (err) {
+      showModal({ title: 'Error', message: err.message || 'Failed to update follow status.', type: 'error' });
+    } finally {
+      setFollowLoading(false);
+    }
   };
 
   /**
@@ -511,6 +572,14 @@ function UserProfilePage() {
               <strong>{commentsTotal.toLocaleString()}</strong>
               <span>Comments</span>
             </div>
+            <div className="profile-stat">
+              <strong>{profileUser.followersCount?.toLocaleString() || 0}</strong>
+              <span>Followers</span>
+            </div>
+            <div className="profile-stat">
+              <strong>{profileUser.followingCount?.toLocaleString() || 0}</strong>
+              <span>Following</span>
+            </div>
           </div>
 
           <p className="profile-header__joined">
@@ -536,13 +605,22 @@ function UserProfilePage() {
             <div className="profile-header__hubs">
               <span className="profile-header__games-label">Communities:</span>
               {profileUser.joinedHubs.map((hub) => (
-                <Link
-                  key={hub._id ?? hub}
-                  to={`/hub/${hub.slug}`}
-                  className="badge badge-info"
-                >
-                  h/{hub.name}
-                </Link>
+                <div key={hub._id ?? hub} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                  <Link
+                    to={`/hub/${hub.slug}`}
+                    className="badge badge-info"
+                  >
+                    h/{hub.name}
+                  </Link>
+                  {isOwnProfile && (
+                    <button 
+                      className="badge badge-danger" 
+                      style={{ cursor: 'pointer', border: 'none' }}
+                      onClick={(e) => handleLeaveHub(e, hub._id, hub.name)}
+                      aria-label={`Leave ${hub.name}`}
+                    >✕</button>
+                  )}
+                </div>
               ))}
             </div>
           )}
@@ -556,6 +634,19 @@ function UserProfilePage() {
             aria-label="Edit your profile"
           >
             ✏️ Edit Profile
+          </button>
+        )}
+
+        {/* Follow button — only shown on other profiles */}
+        {!isOwnProfile && isLoggedIn && (
+          <button
+            className={`btn ${profileUser.isFollowing ? 'btn-secondary' : 'btn-primary'} profile-header__edit`}
+            onClick={handleFollowToggle}
+            disabled={followLoading}
+            aria-label={profileUser.isFollowing ? `Unfollow ${profileUser.username}` : `Follow ${profileUser.username}`}
+            style={{ minWidth: '120px' }}
+          >
+            {followLoading ? '…' : profileUser.isFollowing ? 'Unfollow' : 'Follow'}
           </button>
         )}
       </section>

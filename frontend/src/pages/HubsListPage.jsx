@@ -6,15 +6,46 @@
  */
 import React, { useState, useEffect, useCallback } from 'react';
 import HubCard from '../components/HubCard';
+import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
 import './HubsListPage.css';
 
 function HubsListPage() {
+  const { isLoggedIn } = useAuth();
+
   const [hubs,    setHubs]    = useState([]);
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState('');
   const [search,  setSearch]  = useState('');
   const [sort,    setSort]    = useState('popular');
+
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [newName,        setNewName]        = useState('');
+  const [newGame,        setNewGame]        = useState('');
+  const [newDesc,        setNewDesc]        = useState('');
+  const [creating,       setCreating]       = useState(false);
+  const [createError,    setCreateError]    = useState('');
+
+  // 06.05 Ilia Klodin: any logged-in user can create a hub, POST /api/hubs
+  const handleCreateHub = async (e) => {
+    e.preventDefault();
+    if (!newName.trim()) { setCreateError('Hub name is required.'); return; }
+    setCreating(true); setCreateError('');
+    try {
+      const data = await api.post('/api/hubs', {
+        name: newName.trim(),
+        game: newGame.trim() || undefined,
+        description: newDesc.trim() || undefined,
+      });
+      setHubs(prev => [data.hub, ...prev]);
+      setShowCreateForm(false);
+      setNewName(''); setNewGame(''); setNewDesc('');
+    } catch (err) {
+      setCreateError(err.message);
+    } finally {
+      setCreating(false);
+    }
+  };
 
   const fetchHubs = useCallback(async (searchTerm, sortOrder) => {
     setLoading(true);
@@ -33,7 +64,7 @@ function HubsListPage() {
 
   // Debounce search so we don't hammer the API on every keystroke
   useEffect(() => {
-    const timer = setTimeout(() => fetchHubs(search, sort), 300);
+    const timer = setTimeout(() => fetchHubs(search, sort), 500);
     return () => clearTimeout(timer);
   }, [search, sort, fetchHubs]);
 
@@ -66,7 +97,47 @@ function HubsListPage() {
             </button>
           ))}
         </div>
+        {isLoggedIn && (
+          <button
+            className="btn btn-primary"
+            onClick={() => { setShowCreateForm(p => !p); setCreateError(''); }}
+          >
+            {showCreateForm ? 'Cancel' : '+ Create Hub'}
+          </button>
+        )}
       </div>
+
+      {showCreateForm && (
+        <form onSubmit={handleCreateHub} style={{ marginBottom: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', maxWidth: '480px' }}>
+          <input
+            className="form-input"
+            placeholder="Hub name *"
+            value={newName}
+            onChange={e => { setNewName(e.target.value); setCreateError(''); }}
+            maxLength={100}
+            autoFocus
+          />
+          <input
+            className="form-input"
+            placeholder="Game (optional)"
+            value={newGame}
+            onChange={e => setNewGame(e.target.value)}
+            maxLength={100}
+          />
+          <textarea
+            className="form-textarea"
+            placeholder="Description (optional)"
+            rows={3}
+            value={newDesc}
+            onChange={e => setNewDesc(e.target.value)}
+            maxLength={500}
+          />
+          {createError && <span className="field-error" role="alert">{createError}</span>}
+          <button type="submit" className="btn btn-primary" disabled={creating} style={{ alignSelf: 'flex-start' }}>
+            {creating ? 'Creating…' : 'Create Hub'}
+          </button>
+        </form>
+      )}
 
       {loading ? (
         <div className="empty-state"><p>Loading hubs…</p></div>

@@ -4,22 +4,22 @@ import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
 import './CreatePostPage.css';
 
-const PLATFORMS    = ['PC', 'PlayStation', 'Xbox', 'Nintendo Switch', 'Mobile', 'Cross-platform'];
-const REGIONS      = ['NA', 'EU', 'Asia', 'OCE', 'SA', 'Global'];
+const PLATFORMS = ['PC', 'PlayStation', 'Xbox', 'Nintendo Switch', 'Mobile', 'Cross-platform'];
+const REGIONS = ['NA', 'EU', 'Asia', 'OCE', 'SA', 'Global'];
 const SKILL_LEVELS = ['Beginner', 'Intermediate', 'Advanced', 'Expert', 'Any'];
 
 function CreatePostPage() {
-  const { slug }             = useParams();
+  const { slug } = useParams();
   const { isLoggedIn, user } = useAuth();
-  const navigate             = useNavigate();
+  const navigate = useNavigate();
 
-  const [hub,         setHub]         = useState(null);
-  const [hubLoading,  setHubLoading]  = useState(true);
-  const [hubError,    setHubError]    = useState('');
+  const [hub, setHub] = useState(null);
+  const [hubLoading, setHubLoading] = useState(true);
+  const [hubError, setHubError] = useState('');
 
-  const [postType,    setPostType]    = useState('text');
-  const [imageMode,   setImageMode]   = useState('url'); // 'url' | 'file'
-  const [imageFile,   setImageFile]   = useState(null);
+  const [postType, setPostType] = useState('text');
+  const [imageMode, setImageMode] = useState('url'); // 'url' | 'file'
+  const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState('');
   const fileInputRef = useRef(null);
 
@@ -29,7 +29,7 @@ function CreatePostPage() {
     gameMode: '', playersNeeded: '2', voiceChat: false,
     schedule: '', requirements: '', contactInfo: '',
   });
-  const [errors,     setErrors]     = useState({});
+  const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
 
   // Redirect guests
@@ -38,7 +38,7 @@ function CreatePostPage() {
       <div className="container empty-state" style={{ marginTop: '4rem' }}>
         <h2>You must be logged in to post.</h2>
         <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', marginTop: '1rem' }}>
-          <Link to="/login"    className="btn btn-primary">Log In</Link>
+          <Link to="/login" className="btn btn-primary">Log In</Link>
           <Link to="/register" className="btn btn-secondary">Register</Link>
         </div>
       </div>
@@ -70,17 +70,17 @@ function CreatePostPage() {
   const parseTags = (raw) => {
     if (!raw.trim()) return { valid: true, tags: [] };
     const tags = [...new Set(raw.split(',').map((t) => t.trim()).filter(Boolean))];
-    if (tags.length > 5)        return { valid: false, tags, error: 'Maximum 5 tags allowed.' };
+    if (tags.length > 5) return { valid: false, tags, error: 'Maximum 5 tags allowed.' };
     const tooLong = tags.find((t) => t.length > 30);
-    if (tooLong)                return { valid: false, tags, error: `Tag "${tooLong}" exceeds 30 characters.` };
+    if (tooLong) return { valid: false, tags, error: `Tag "${tooLong}" exceeds 30 characters.` };
     return { valid: true, tags };
   };
 
   const validate = () => {
     const errs = {};
-    if (!formData.title.trim())             errs.title   = 'Title is required.';
-    else if (formData.title.trim().length < 3)  errs.title   = 'Title must be at least 3 characters.';
-    else if (formData.title.trim().length > 300) errs.title  = 'Title cannot exceed 300 characters.';
+    if (!formData.title.trim()) errs.title = 'Title is required.';
+    else if (formData.title.trim().length < 3) errs.title = 'Title must be at least 3 characters.';
+    else if (formData.title.trim().length > 300) errs.title = 'Title cannot exceed 300 characters.';
 
     if ((postType === 'text' || postType === 'lfg') && !formData.content.trim()) errs.content = 'Post body is required.';
     if (formData.content.length > 40000) errs.content = 'Content cannot exceed 40,000 characters.';
@@ -107,7 +107,7 @@ function CreatePostPage() {
     if (postType === 'lfg') {
       const pn = parseInt(formData.playersNeeded, 10);
       if (isNaN(pn) || pn < 1) errs.playersNeeded = 'Players needed must be at least 1.';
-      if (pn > 100)             errs.playersNeeded = 'Players needed cannot exceed 100.';
+      if (pn > 100) errs.playersNeeded = 'Players needed cannot exceed 100.';
       if (!formData.contactInfo.trim()) errs.contactInfo = 'Contact information is required.';
     }
 
@@ -139,25 +139,25 @@ function CreatePostPage() {
         body = fd;
       } else {
         body = {
-          title:   formData.title.trim(),
+          title: formData.title.trim(),
           content: formData.content.trim(),
-          type:    postType,
-          url:     (postType === 'image' || postType === 'link') ? formData.url : undefined,
+          type: postType,
+          url: (postType === 'image' || postType === 'link') ? formData.url : undefined,
           tags,
-          flair:   formData.flair.trim(),
+          flair: formData.flair.trim(),
           ...(postType === 'lfg' && {
             lfgDetails: {
-              platform:      formData.platform,
-              region:        formData.region,
-              skillLevel:    formData.skillLevel,
-              gameMode:      formData.gameMode,
+              platform: formData.platform,
+              region: formData.region,
+              skillLevel: formData.skillLevel,
+              gameMode: formData.gameMode,
               playersNeeded: parseInt(formData.playersNeeded, 10),
               currentPlayers: 1,
-              voiceChat:     formData.voiceChat,
-              schedule:      formData.schedule,
-              requirements:  formData.requirements,
-              contactInfo:   formData.contactInfo,
-              status:        'open',
+              voiceChat: formData.voiceChat,
+              schedule: formData.schedule,
+              requirements: formData.requirements,
+              contactInfo: formData.contactInfo,
+              status: 'open',
             },
           }),
         };
@@ -172,11 +172,11 @@ function CreatePostPage() {
     }
   };
 
-  const titleLeft   = 300 - formData.title.length;
+  const titleLeft = 300 - formData.title.length;
   const contentLeft = 40000 - formData.content.length;
 
   if (hubLoading) return <div className="container empty-state" style={{ marginTop: '4rem' }}><p>Loading hub…</p></div>;
-  if (hubError)   return <div className="container empty-state" style={{ marginTop: '4rem' }}><h2>{hubError}</h2><Link to="/hubs" className="btn btn-primary" style={{ marginTop: '1rem' }}>Browse Hubs</Link></div>;
+  if (hubError) return <div className="container empty-state" style={{ marginTop: '4rem' }}><h2>{hubError}</h2><Link to="/hubs" className="btn btn-primary" style={{ marginTop: '1rem' }}>Browse Hubs</Link></div>;
 
   const hubName = hub?.name ?? slug;
 
@@ -195,12 +195,16 @@ function CreatePostPage() {
 
           <h1 className="create-post__title">Create a Post in h/{hubName}</h1>
 
+          <p style={{ marginBottom: '0.5rem', color: 'var(--color-text-muted)', fontSize: 'var(--fs-sm)' }}>
+            Select the type of post you want to create. A post can only be <strong>one</strong> type (Text, Image, Link, or LFG).
+          </p>
+
           <div className="post-type-tabs" role="tablist" aria-label="Post type">
             {[
-              { key: 'text',  label: '📝 Text'  },
+              { key: 'text', label: '📝 Text' },
               { key: 'image', label: '🖼 Image' },
-              { key: 'link',  label: '🔗 Link'  },
-              { key: 'lfg',   label: '👥 LFG'   },
+              { key: 'link', label: '🔗 Link' },
+              { key: 'lfg', label: '👥 LFG' },
             ].map(({ key, label }) => (
               <button
                 key={key}

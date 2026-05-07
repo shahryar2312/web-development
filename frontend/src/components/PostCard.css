@@ -95,6 +95,18 @@
   color: var(--color-text-muted);
 }
 
+.post-card__author-link {
+  color: var(--color-primary);
+  font-weight: 500;
+  text-decoration: none;
+  transition: color var(--transition);
+}
+
+.post-card__author-link:hover {
+  color: var(--color-primary-hover);
+  text-decoration: underline;
+}
+
 .post-card__title {
   font-size: var(--fs-lg);
   font-weight: 700;
@@ -105,6 +117,7 @@
 .post-card__title a {
   color: var(--color-text) !important;
   transition: color var(--transition);
+  
 }
 
 .post-card__title a:hover {

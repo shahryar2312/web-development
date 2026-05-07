@@ -11,11 +11,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useModal } from '../context/ModalContext';
 import { api } from '../services/api';
 import './AdminDashboard.css';
 
 function AdminDashboard() {
   const { user, isLoggedIn } = useAuth();
+  const { showModal }        = useModal();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('users');
 
@@ -79,7 +81,7 @@ function AdminDashboard() {
       await api.patch(`/api/users/${_id}/ban`, { isBanned: !u?.isBanned });
       setUsers(users.map((u) => u._id === _id ? { ...u, isBanned: !u.isBanned } : u));
     } catch (err) {
-      alert(err.message);
+      showModal({ title: 'Error', message: err.message, type: 'error' });
     }
   };
 
@@ -90,21 +92,29 @@ function AdminDashboard() {
       await api.patch(`/api/users/${_id}/role`, { role: newRole });
       setUsers(users.map((u) => u._id === _id ? { ...u, role: newRole } : u));
     } catch (err) {
-      alert(err.message);
+      showModal({ title: 'Error', message: err.message, type: 'error' });
     }
   };
 
   /* ---- Hub actions ---- */
 
   const handleDeleteHub = async (_id) => {
-    if (!window.confirm('Delete this hub? This cannot be undone.')) return;
-    try {
-      await api.delete(`/api/hubs/${_id}`);
-      setHubs(hubs.filter((h) => h._id !== _id));
-      if (selectedHubId === _id) { setSelectedHubId(null); setSelectedHubDetails(null); }
-    } catch (err) {
-      alert(err.message);
-    }
+    showModal({
+      title: 'Delete Hub',
+      message: 'Delete this hub? This cannot be undone.',
+      type: 'error',
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      onConfirm: async () => {
+        try {
+          await api.delete(`/api/hubs/${_id}`);
+          setHubs(hubs.filter((h) => h._id !== _id));
+          if (selectedHubId === _id) { setSelectedHubId(null); setSelectedHubDetails(null); }
+        } catch (err) {
+          showModal({ title: 'Error', message: err.message, type: 'error' });
+        }
+      }
+    });
   };
 
   const handleManageHub = async (_id) => {
@@ -124,7 +134,7 @@ function AdminDashboard() {
       const data = await api.get(`/api/hubs/${_id}`);
       setSelectedHubDetails(data.hub);
     } catch (err) {
-      alert('Failed to load hub details.');
+      showModal({ title: 'Error', message: 'Failed to load hub details.', type: 'error' });
       setSelectedHubId(null);
     }
   };
@@ -194,13 +204,21 @@ function AdminDashboard() {
   /* ---- Post actions ---- */
 
   const handleDeletePost = async (_id) => {
-    if (!window.confirm('Delete this post?')) return;
-    try {
-      await api.delete(`/api/posts/${_id}`);
-      setPosts(posts.filter((p) => p._id !== _id));
-    } catch (err) {
-      alert(err.message);
-    }
+    showModal({
+      title: 'Delete Post',
+      message: 'Are you sure you want to delete this post? This cannot be undone.',
+      type: 'error',
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      onConfirm: async () => {
+        try {
+          await api.delete(`/api/posts/${_id}`);
+          setPosts(posts.filter((p) => p._id !== _id));
+        } catch (err) {
+          showModal({ title: 'Error', message: err.message, type: 'error' });
+        }
+      }
+    });
   };
 
   const handleToggleLock = async (_id) => {
@@ -209,7 +227,7 @@ function AdminDashboard() {
       await api.patch(`/api/posts/${_id}/lock`, { isLocked: !post?.isLocked });
       setPosts(posts.map((p) => p._id === _id ? { ...p, isLocked: !p.isLocked } : p));
     } catch (err) {
-      alert(err.message);
+      showModal({ title: 'Error', message: err.message, type: 'error' });
     }
   };
 

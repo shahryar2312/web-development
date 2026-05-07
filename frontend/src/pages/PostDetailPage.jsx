@@ -14,9 +14,10 @@
  *   Vote comment— POST /api/comments/:commentId/vote { value: 1|-1 }
  */
 import React, { useState, useEffect } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
+import { useModal } from '../context/ModalContext';
 import './PostDetailPage.css';
 
 /* ------------------------------------------------------------------ */
@@ -30,7 +31,7 @@ import './PostDetailPage.css';
  * Called with the flat=true response from GET /api/posts/:postId/comments.
  */
 function buildCommentTree(flatComments) {
-  const byId  = {};
+  const byId = {};
   const roots = [];
   flatComments.forEach((c) => { byId[c._id] = { ...c, replies: [] }; });
   flatComments.forEach((c) => {
@@ -59,10 +60,11 @@ function buildCommentTree(flatComments) {
  */
 function CommentItem({ comment, postId, isLocked, onReplyAdded }) {
   const { isLoggedIn, user } = useAuth();
-  const [score,      setScore]      = useState(comment.voteScore ?? 0);
-  const [userVote,   setUserVote]   = useState(comment.userVote ?? 0);
-  const [showReply,  setShowReply]  = useState(false);
-  const [replyText,  setReplyText]  = useState('');
+  const { showModal } = useModal();
+  const [score, setScore] = useState(comment.voteScore ?? 0);
+  const [userVote, setUserVote] = useState(comment.userVote ?? 0);
+  const [showReply, setShowReply] = useState(false);
+  const [replyText, setReplyText] = useState('');
   const [replyError, setReplyError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -71,7 +73,7 @@ function CommentItem({ comment, postId, isLocked, onReplyAdded }) {
    * Maps to: POST /api/comments/:commentId/vote  { value }
    */
   const handleVote = async (val) => {
-    if (!isLoggedIn) { alert('Please log in to vote.'); return; }
+    if (!isLoggedIn) { showModal({ title: 'Authentication Required', message: 'Please log in to vote.', type: 'error' }); return; }
     try {
       // 03.05 Ilia Klodin: was sending value:0 on second click which backend rejects with 400, same value cancels instead
       const data = await api.post(`/api/comments/${comment._id}/vote`, { value: val });
@@ -96,7 +98,7 @@ function CommentItem({ comment, postId, isLocked, onReplyAdded }) {
     try {
       const data = await api.post(`/api/posts/${postId}/comments`, {
         content: trimmed,
-        parent:  comment._id,
+        parent: comment._id,
       });
       onReplyAdded(comment._id, { ...data.comment, replies: [] });
       setReplyText('');
@@ -110,8 +112,8 @@ function CommentItem({ comment, postId, isLocked, onReplyAdded }) {
 
   const formatDate = (iso) => {
     const delta = (Date.now() - new Date(iso).getTime()) / 1000;
-    if (delta < 60)    return 'just now';
-    if (delta < 3600)  return `${Math.floor(delta / 60)}m ago`;
+    if (delta < 60) return 'just now';
+    if (delta < 3600) return `${Math.floor(delta / 60)}m ago`;
     if (delta < 86400) return `${Math.floor(delta / 3600)}h ago`;
     return `${Math.floor(delta / 86400)}d ago`;
   };
@@ -184,27 +186,35 @@ function CommentItem({ comment, postId, isLocked, onReplyAdded }) {
 /* ------------------------------------------------------------------ */
 
 function PostDetailPage() {
-  const { postId }           = useParams();
+  const { postId } = useParams();
   const { isLoggedIn, user } = useAuth();
+  const { showModal } = useModal();
+  const navigate = useNavigate();
 
   /* Post and comments loaded from the API */
-  const [post,         setPost]         = useState(null);
-  const [commentTree,  setCommentTree]  = useState([]);
-  const [loading,      setLoading]      = useState(true);
-  const [error,        setError]        = useState('');
+  const [post, setPost] = useState(null);
+  const [commentTree, setCommentTree] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   /* Vote state for the post itself */
   const [postScore, setPostScore] = useState(0);
-  const [postVote,  setPostVote]  = useState(0);
+  const [postVote, setPostVote] = useState(0);
 
   /* Comment form state */
-  const [commentText,   setCommentText]   = useState('');
-  const [commentError,  setCommentError]  = useState('');
-  const [submitting,    setSubmitting]    = useState(false);
+  const [commentText, setCommentText] = useState('');
+  const [commentError, setCommentError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
 
   // 05.05 Ilia Klodin: click-to-expand image viewer, escape key to dismiss
   const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [postHub, setPostHub] = useState(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState('');
+  const [editContent, setEditContent] = useState('');
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState('');
 
   useEffect(() => {
     if (!lightboxOpen) return;
@@ -225,12 +235,20 @@ function PostDetailPage() {
       .then(([postData, commentsData]) => {
         setPost(postData.post);
         setPostScore(postData.post.voteScore ?? 0);
-        setPostVote(postData.post.userVote   ?? 0);
+        setPostVote(postData.post.userVote ?? 0);
         setCommentTree(buildCommentTree(commentsData.comments || []));
       })
       .catch(() => setError('Post not found or failed to load.'))
       .finally(() => setLoading(false));
   }, [postId]);
+
+  // 07.05 Ilia Klodin: fetch hub staff after post loads so mod tools know who has permissions
+  useEffect(() => {
+    if (!post?._id) return;
+    api.get(`/api/hubs/${post.hub._id}`)
+      .then(d => setPostHub(d.hub))
+      .catch(() => { });
+  }, [post?._id]);
 
   /* Loading / error guards */
   if (loading) {
@@ -252,12 +270,71 @@ function PostDetailPage() {
     );
   }
 
+  const isOwner = user?._id?.toString() === post.author?._id?.toString();
+  const isAdmin = user?.role === 'admin';
+  const isHubMod = postHub?.moderators?.some(m => m._id?.toString() === user?._id?.toString()) ?? false;
+  const isHubCreator = postHub?.creator?._id?.toString() === user?._id?.toString() ?? false;
+  const canModerate = isAdmin || isHubMod || isHubCreator;
+  const canDelete = isOwner || canModerate;
+
+  // 06.05 Ilia Klodin: author can edit their own unlocked post, author/admin can delete
+  const handleEditStart = () => { setEditTitle(post.title); setEditContent(post.content || ''); setEditError(''); setIsEditing(true); };
+  const handleEditCancel = () => { setIsEditing(false); setEditError(''); };
+  const handleEditSubmit = async (e) => {
+    e.preventDefault();
+    if (!editTitle.trim()) { setEditError('Title cannot be empty.'); return; }
+    setEditSaving(true); setEditError('');
+    try {
+      const data = await api.put(`/api/posts/${postId}`, { title: editTitle.trim(), content: editContent.trim() || undefined });
+      setPost(prev => ({ ...prev, title: data.post.title, content: data.post.content }));
+      setIsEditing(false);
+    } catch (err) { setEditError(err.message); }
+    finally { setEditSaving(false); }
+  };
+  const handleDelete = () => {
+    showModal({
+      title: 'Delete Post',
+      message: 'Are you sure you want to delete this post? This cannot be undone.',
+      type: 'error', confirmText: 'Delete', cancelText: 'Cancel',
+      onConfirm: async () => {
+        try { await api.delete(`/api/posts/${postId}`); navigate(`/hub/${post.hub.slug}`); }
+        catch (err) { console.error('Delete failed:', err.message); }
+      },
+    });
+  };
+
+  // 07.05 Ilia Klodin: mod actions — lock toggles comments, ban removes user from the hub
+  const handleLockToggle = async () => {
+    try {
+      const data = await api.patch(`/api/posts/${postId}/lock`, { isLocked: !post.isLocked });
+      setPost(prev => ({ ...prev, isLocked: data.post.isLocked }));
+    } catch (err) {
+      showModal({ title: 'Error', message: err.message, type: 'error' });
+    }
+  };
+
+  const handleBanFromHub = () => {
+    showModal({
+      title: 'Ban from Hub',
+      message: `Ban u/${post.author.username} from h/${post.hub.name}? They won't be able to post or comment here.`,
+      type: 'error', confirmText: 'Ban User', cancelText: 'Cancel',
+      onConfirm: async () => {
+        try {
+          await api.post(`/api/hubs/${post.hub._id}/ban/${post.author._id}`);
+          showModal({ title: 'Done', message: `u/${post.author.username} has been banned from h/${post.hub.name}.`, type: 'success' });
+        } catch (err) {
+          showModal({ title: 'Error', message: err.message, type: 'error' });
+        }
+      },
+    });
+  };
+
   /**
    * handlePostVote — Votes on the main post.
    * Maps to: POST /api/posts/:postId/vote  { value }
    */
   const handlePostVote = async (val) => {
-    if (!isLoggedIn) { alert('Please log in to vote.'); return; }
+    if (!isLoggedIn) { showModal({ title: 'Authentication Required', message: 'Please log in to vote.', type: 'error' }); return; }
     try {
       // 03.05 Ilia Klodin: was sending value:0 on second click which backend rejects with 400, same value cancels instead
       const data = await api.post(`/api/posts/${postId}/vote`, { value: val });
@@ -331,8 +408,8 @@ function PostDetailPage() {
 
   const formatDate = (iso) => {
     const delta = (Date.now() - new Date(iso).getTime()) / 1000;
-    if (delta < 60)    return 'just now';
-    if (delta < 3600)  return `${Math.floor(delta / 60)}m ago`;
+    if (delta < 60) return 'just now';
+    if (delta < 3600) return `${Math.floor(delta / 60)}m ago`;
     if (delta < 86400) return `${Math.floor(delta / 3600)}h ago`;
     return `${Math.floor(delta / 86400)}d ago`;
   };
@@ -367,9 +444,9 @@ function PostDetailPage() {
 
               {/* Vote column */}
               <div className="post-card__votes">
-                <button className={`vote-btn vote-btn--up ${postVote === 1 ? 'active' : ''}`} onClick={() => handlePostVote(1)} aria-label="Upvote">▲</button>
-                <span className="vote-btn__score" aria-live="polite">{postScore}</span>
-                <button className={`vote-btn vote-btn--down ${postVote === -1 ? 'active' : ''}`} onClick={() => handlePostVote(-1)} aria-label="Downvote">▼</button>
+                <button className={`vote-btn vote-btn--up ${postVote === 1 ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); handlePostVote(1); }} aria-label="Upvote">▲</button>
+                <span className="vote-btn__score" aria-live="polite">{postScore < 0 ? 0 : postScore}</span>
+                <button className={`vote-btn vote-btn--down ${postVote === -1 ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); handlePostVote(-1); }} aria-label="Downvote">▼</button>
               </div>
 
               {/* Content */}
@@ -386,16 +463,45 @@ function PostDetailPage() {
                   {post.isLocked && <span className="badge badge-danger">🔒 Locked</span>}
                 </div>
 
-                {/* Title */}
-                <h1 className="post-detail__title">{post.title}</h1>
-
-                {/* Body */}
-                {post.content && (
-                  <div className="post-detail__body">
-                    {post.content.split('\n').map((line, i) => (
-                      <p key={i}>{line || <br />}</p>
-                    ))}
-                  </div>
+                {/* Title + Body — or inline edit form */}
+                {isEditing ? (
+                  <form onSubmit={handleEditSubmit} className="post-detail__edit-form">
+                    <input
+                      className="form-input"
+                      value={editTitle}
+                      onChange={e => setEditTitle(e.target.value)}
+                      maxLength={300}
+                      placeholder="Post title"
+                      autoFocus
+                    />
+                    <textarea
+                      className="form-textarea"
+                      rows={6}
+                      value={editContent}
+                      onChange={e => setEditContent(e.target.value)}
+                      maxLength={40000}
+                      placeholder="Post content (optional)"
+                      style={{ marginTop: '0.5rem' }}
+                    />
+                    {editError && <span className="field-error" role="alert">{editError}</span>}
+                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                      <button type="submit" className="btn btn-primary btn-sm" disabled={editSaving}>
+                        {editSaving ? 'Saving…' : 'Save'}
+                      </button>
+                      <button type="button" className="btn btn-secondary btn-sm" onClick={handleEditCancel}>Cancel</button>
+                    </div>
+                  </form>
+                ) : (
+                  <>
+                    <h1 className="post-detail__title">{post.title}</h1>
+                    {post.content && (
+                      <div className="post-detail__body">
+                        {post.content.split('\n').map((line, i) => (
+                          <p key={i}>{line || <br />}</p>
+                        ))}
+                      </div>
+                    )}
+                  </>
                 )}
 
                 {/* Image or link URL */}
@@ -403,8 +509,8 @@ function PostDetailPage() {
                   <div className="post-detail__url">
                     {post.type === 'image'
                       ? <button className="post-detail__image-btn" onClick={() => setLightboxOpen(true)} aria-label="View full image">
-                          <img src={post.url} alt="Post image" className="post-detail__image" />
-                        </button>
+                        <img src={post.url} alt="Post image" className="post-detail__image" />
+                      </button>
                       : <a href={post.url} target="_blank" rel="noopener noreferrer" className="post-card__link">🔗 {post.url}</a>
                     }
                   </div>
@@ -426,16 +532,16 @@ function PostDetailPage() {
                 {/* LFG details block */}
                 {post.lfgDetails && post.type === 'lfg' && (
                   <div className="lfg-card__details" style={{ marginTop: '1rem' }}>
-                    {post.lfgDetails.platform    && <div className="lfg-detail"><span className="lfg-detail__key">Platform</span><span className="lfg-detail__val">{post.lfgDetails.platform}</span></div>}
-                    {post.lfgDetails.region      && <div className="lfg-detail"><span className="lfg-detail__key">Region</span><span className="lfg-detail__val">{post.lfgDetails.region}</span></div>}
-                    {post.lfgDetails.skillLevel  && <div className="lfg-detail"><span className="lfg-detail__key">Skill</span><span className="lfg-detail__val">{post.lfgDetails.skillLevel}</span></div>}
-                    {post.lfgDetails.gameMode    && <div className="lfg-detail"><span className="lfg-detail__key">Mode</span><span className="lfg-detail__val">{post.lfgDetails.gameMode}</span></div>}
+                    {post.lfgDetails.platform && <div className="lfg-detail"><span className="lfg-detail__key">Platform</span><span className="lfg-detail__val">{post.lfgDetails.platform}</span></div>}
+                    {post.lfgDetails.region && <div className="lfg-detail"><span className="lfg-detail__key">Region</span><span className="lfg-detail__val">{post.lfgDetails.region}</span></div>}
+                    {post.lfgDetails.skillLevel && <div className="lfg-detail"><span className="lfg-detail__key">Skill</span><span className="lfg-detail__val">{post.lfgDetails.skillLevel}</span></div>}
+                    {post.lfgDetails.gameMode && <div className="lfg-detail"><span className="lfg-detail__key">Mode</span><span className="lfg-detail__val">{post.lfgDetails.gameMode}</span></div>}
                     {post.lfgDetails.playersNeeded && <div className="lfg-detail"><span className="lfg-detail__key">Spots</span><span className="lfg-detail__val">{post.lfgDetails.playersNeeded - (post.lfgDetails.currentPlayers || 1)} of {post.lfgDetails.playersNeeded} left</span></div>}
                     {post.lfgDetails.voiceChat !== undefined && <div className="lfg-detail"><span className="lfg-detail__key">Voice</span><span className="lfg-detail__val">{post.lfgDetails.voiceChat ? '🎙 Required' : '🔇 Optional'}</span></div>}
-                    {post.lfgDetails.status      && <div className="lfg-detail"><span className="lfg-detail__key">Status</span><span className={`badge ${post.lfgDetails.status === 'open' ? 'badge-success' : 'badge-danger'}`}>{post.lfgDetails.status}</span></div>}
-                    {post.lfgDetails.schedule    && <p className="lfg-card__extra">🕐 <strong>Schedule:</strong> {post.lfgDetails.schedule}</p>}
+                    {post.lfgDetails.status && <div className="lfg-detail"><span className="lfg-detail__key">Status</span><span className={`badge ${post.lfgDetails.status === 'open' ? 'badge-success' : 'badge-danger'}`}>{post.lfgDetails.status}</span></div>}
+                    {post.lfgDetails.schedule && <p className="lfg-card__extra">🕐 <strong>Schedule:</strong> {post.lfgDetails.schedule}</p>}
                     {post.lfgDetails.requirements && <p className="lfg-card__extra">📋 <strong>Requirements:</strong> {post.lfgDetails.requirements}</p>}
-                    {post.lfgDetails.contactInfo  && <p className="lfg-card__extra">📩 <strong>Contact:</strong> {post.lfgDetails.contactInfo}</p>}
+                    {post.lfgDetails.contactInfo && <p className="lfg-card__extra">📩 <strong>Contact:</strong> {post.lfgDetails.contactInfo}</p>}
                   </div>
                 )}
 
@@ -443,6 +549,30 @@ function PostDetailPage() {
                 {post.tags?.length > 0 && (
                   <div className="post-card__tags">
                     {post.tags.map((t) => <span key={t} className="post-card__tag">#{t}</span>)}
+                  </div>
+                )}
+
+                {/* 07.05 Ilia Klodin: edit for author, delete/lock/ban for mods and admin */}
+                {!isEditing && (isOwner || canModerate) && (
+                  <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem', flexWrap: 'wrap' }}>
+                    {isOwner && !post.isLocked && (
+                      <button className="btn btn-secondary btn-sm" onClick={handleEditStart}>Edit</button>
+                    )}
+                    {canDelete && (
+                      <button className="btn btn-secondary btn-sm" style={{ color: 'var(--color-danger, #e53e3e)' }} onClick={handleDelete}>
+                        Delete
+                      </button>
+                    )}
+                    {canModerate && (
+                      <button className="btn btn-secondary btn-sm" onClick={handleLockToggle}>
+                        {post.isLocked ? 'Unlock' : 'Lock'}
+                      </button>
+                    )}
+                    {canModerate && !isOwner && (
+                      <button className="btn btn-secondary btn-sm" style={{ color: 'var(--color-danger, #e53e3e)' }} onClick={handleBanFromHub}>
+                        Ban from Hub
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -456,7 +586,7 @@ function PostDetailPage() {
             </h2>
 
             {post.isLocked ? ( /* ---- 28.04 Ilia Klodin -added post locked state in light of expanded admin-mod functionality----- */
-                              /* previously the comment form was still present for locked posts, which made 0 sense */
+              /* previously the comment form was still present for locked posts, which made 0 sense */
               <div className="comment-form__guest card">
                 <p>🔒 This post has been locked by a moderator. No new comments can be added.</p>
               </div>
@@ -499,7 +629,7 @@ function PostDetailPage() {
               <div className="comment-form__guest card">
                 <p>You must be logged in to comment.</p>
                 <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem' }}>
-                  <Link to="/login"    className="btn btn-primary">Log In</Link>
+                  <Link to="/login" className="btn btn-primary">Log In</Link>
                   <Link to="/register" className="btn btn-secondary">Register</Link>
                 </div>
               </div>

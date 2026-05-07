@@ -93,7 +93,7 @@ const initialForm = {
 };
 
 function LFGPage() {
-  const { isLoggedIn, user } = useAuth();
+  const { isLoggedIn, user, activeHub } = useAuth();
 
   /* ---- Filter state ---- */
   const [platform,     setPlatform]     = useState('All');
@@ -130,11 +130,12 @@ function LFGPage() {
         const list = data.hubs || [];
         setHubs(list);
         if (list.length > 0) {
-          setFormData((prev) => ({ ...prev, hubId: list[0]._id }));
+          const defaultHubId = activeHub ? (activeHub._id || activeHub) : list[0]._id;
+          setFormData((prev) => ({ ...prev, hubId: defaultHubId }));
         }
       })
       .catch(console.error);
-  }, []);
+  }, [activeHub]);
 
   /**
    * buildParams — Builds URLSearchParams from current filter state.

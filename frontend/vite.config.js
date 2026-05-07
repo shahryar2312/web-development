@@ -15,4 +15,15 @@ export default defineConfig({
       },
     },
   },
+  test: {
+    // Use jsdom so React components can render with a DOM
+    environment: 'jsdom',
+    // Auto-import vitest globals (describe, it, expect, vi, beforeEach, …)
+    globals: true,
+    // Run this file before each test file to set up jest-dom matchers
+    setupFiles: ['./src/tests/setup.js'],
+    // Don't print noisy logs from components during tests
+    silent: false,
+  },
 });
+
