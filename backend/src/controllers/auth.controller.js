@@ -37,8 +37,10 @@ const login = asyncHandler(async (req, res) => {
   const { email: identifier, password } = req.body;
 
   // 04.05 Ilia Klodin: added another obvious missing feature - login with the username, not only with email
+  // 06.05 Ilia Klodin: case-insensitive username match so "iliatest" finds "IliaTest"
+  const escapedId = identifier.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const user = await User.findOne({
-    $or: [{ email: identifier.toLowerCase() }, { username: identifier }],
+    $or: [{ email: identifier.toLowerCase() }, { username: { $regex: `^${escapedId}$`, $options: 'i' } }],
   }).select('+password');
   if (!user || !(await user.comparePassword(password))) {
     return error(res, 'Invalid email/username or password.', 401);
@@ -77,7 +79,10 @@ const logout = asyncHandler(async (req, res) => {
  * @route   GET /api/auth/me
  * @access  Private
  */
-const getMe = (req, res) => success(res, { user: req.user });
+const getMe = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user._id).populate('joinedHubs', 'name slug icon game memberCount description');
+  return success(res, { user });
+});
 
 /**
  * @desc    Forgot password — sends a reset token to the user's email
@@ -91,24 +96,40 @@ const forgotPassword = asyncHandler(async (req, res) => {
   if (!user) return error(res, 'There is no user with that email.', 404);
 
   const resetToken = await AuthService.createPasswordResetToken(user);
-  
-  // Create reset URL
-  const resetUrl = `${req.protocol}://${req.get('host')}/api/auth/resetpassword/${resetToken}`;
-  const message = `You are receiving this email because you (or someone else) has requested the reset of a password. Please make a PUT request to: \n\n ${resetUrl}`;
+
+  // Point to the frontend reset page, not the raw API endpoint
+  const clientOrigin = process.env.CLIENT_ORIGIN || 'http://localhost:3000';
+  const resetUrl = `${clientOrigin}/reset-password/${resetToken}`;
+
+  const message = `You requested a password reset for your GamerHub account.\n\nClick the link below to reset your password (valid for 10 minutes):\n\n${resetUrl}\n\nIf you did not request this, please ignore this email.`;
+
+  const html = `
+    <div style="font-family:sans-serif;max-width:560px;margin:auto;padding:32px;background:#1a1d27;color:#e2e8f0;border-radius:12px;">
+      <h2 style="color:#7c3aed;margin-bottom:16px;">🎮 GamerHub Password Reset</h2>
+      <p>You requested a password reset for your GamerHub account.</p>
+      <p>Click the button below to choose a new password. This link is valid for <strong>10 minutes</strong>.</p>
+      <a href="${resetUrl}" style="display:inline-block;margin:24px 0;padding:12px 28px;background:#7c3aed;color:#fff;border-radius:8px;text-decoration:none;font-weight:bold;">Reset Password</a>
+      <p style="color:#94a3b8;font-size:13px;">If the button doesn't work, copy and paste this link into your browser:<br/><a href="${resetUrl}" style="color:#06b6d4;">${resetUrl}</a></p>
+      <hr style="border-color:#2e3250;margin:24px 0"/>
+      <p style="color:#64748b;font-size:12px;">If you did not request this, you can safely ignore this email. Your password will not change.</p>
+    </div>
+  `;
 
   try {
     await sendEmail({
       email: user.email,
-      subject: 'Password reset token',
+      subject: 'GamerHub — Password Reset Request',
       message,
+      html,
     });
 
-    return success(res, { message: 'Email sent' });
+    return success(res, { message: 'Password reset email sent. Please check your inbox.' });
   } catch (err) {
+    console.error('[ForgotPassword] Failed to send reset email:', err.message);
     user.resetPasswordToken = undefined;
     user.resetPasswordExpire = undefined;
     await user.save({ validateBeforeSave: false });
-    return error(res, 'Email could not be sent', 500);
+    return error(res, 'Email could not be sent. Please try again later.', 500);
   }
 });
 

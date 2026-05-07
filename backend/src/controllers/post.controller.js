@@ -1,10 +1,11 @@
 const Post = require('../models/Post');
 const Hub = require('../models/Hub');
+const User = require('../models/User');
 const EngagementService = require('../services/EngagementService');
 const { success, error } = require('../utils/apiResponse');
 const asyncHandler = require('../utils/asyncHandler');
-
-const PAGE_SIZE = 20;
+const escapeRegex = require('../utils/escapeRegex');
+const { PAGE_SIZE } = require('../utils/constants');
 
 /**
  * @desc    Get paginated posts for a hub with sort and type filtering
@@ -12,13 +13,21 @@ const PAGE_SIZE = 20;
  * @access  Public
  */
 const getHubPosts = asyncHandler(async (req, res) => {
-  const { page = 1, sort = 'new', type } = req.query;
+  const { page = 1, sort = 'new', type, search } = req.query;
 
   const hub = await Hub.findById(req.params.hubId);
   if (!hub) return error(res, 'Hub not found.', 404);
 
   const filter = { hub: hub._id };
   if (type) filter.type = type;
+  if (search) {
+    const regex = new RegExp(escapeRegex(search), 'i');
+    filter.$or = [
+      { title: regex },
+      { content: regex },
+      { tags: regex },
+    ];
+  }
 
   const sortMap = {
     new: { createdAt: -1 },
@@ -113,18 +122,18 @@ const getPost = asyncHandler(async (req, res) => {
 const updatePost = asyncHandler(async (req, res) => {
   const post = await Post.findById(req.params.postId);
   if (!post) return error(res, 'Post not found.', 404);
-  
+
   if (post.author.toString() !== req.user._id.toString()) {
     return error(res, 'Not authorised to edit this post.', 403);
   }
-  
+
   if (post.isLocked) return error(res, 'Post is locked.', 403);
 
   const editable = ['title', 'content', 'url', 'tags', 'flair'];
-  editable.forEach((f) => { 
-    if (req.body[f] !== undefined) post[f] = req.body[f]; 
+  editable.forEach((f) => {
+    if (req.body[f] !== undefined) post[f] = req.body[f];
   });
-  
+
   if (req.body.lfgDetails !== undefined && post.type === 'lfg') {
     post.lfgDetails = req.body.lfgDetails;
   }
@@ -206,7 +215,7 @@ const lockPost = asyncHandler(async (req, res) => {
  */
 // 01.05 Ilia Klodin: home page needed a cross-hub feed not just per-hub posts so added global endpoint
 const getGlobalPosts = asyncHandler(async (req, res) => {
-  const { page = 1, sort = 'new' } = req.query;
+  const { page = 1, sort = 'new', filter } = req.query;
 
   const sortMap = {
     new: { createdAt: -1 },
@@ -214,14 +223,21 @@ const getGlobalPosts = asyncHandler(async (req, res) => {
     top: { voteScore: -1 },
   };
 
+  const dbFilter = {};
+  if (filter === 'following') {
+    if (!req.user) return error(res, 'Must be logged in.', 401);
+    const user = await User.findById(req.user._id).select('following');
+    dbFilter.author = { $in: user.following };
+  }
+
   const [posts, total] = await Promise.all([
-    Post.find()
+    Post.find(dbFilter)
       .populate('author', 'username avatar')
       .populate('hub', 'name slug icon')
       .sort(sortMap[sort] || sortMap.new)
       .skip((page - 1) * PAGE_SIZE)
       .limit(PAGE_SIZE),
-    Post.countDocuments(),
+    Post.countDocuments(dbFilter),
   ]);
 
   const meta = { page: Number(page), limit: PAGE_SIZE, total, pages: Math.ceil(total / PAGE_SIZE) };

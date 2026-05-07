@@ -42,6 +42,8 @@ const userSchema = new mongoose.Schema(
     },
     isBanned: { type: Boolean, default: false },
     joinedHubs: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Hub' }],
+    followers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+    following: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     favoriteGames: [{ type: String, maxlength: 50 }],
     resetPasswordToken: String,
     resetPasswordExpire: Date,

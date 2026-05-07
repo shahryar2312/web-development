@@ -15,9 +15,22 @@ const getUser = asyncHandler(async (req, res) => {
   const user = await User.findOne({ username: req.params.username }).populate(
     'joinedHubs',
     'name slug icon game memberCount'
-  );
+  ).select('-password');
+  
   if (!user) return error(res, 'User not found.', 404);
-  return success(res, { user });
+  
+  // Convert to plain object to attach custom properties if needed
+  const userData = user.toObject();
+  userData.followersCount = user.followers?.length || 0;
+  userData.followingCount = user.following?.length || 0;
+  
+  let isFollowing = false;
+  if (req.user) {
+    isFollowing = user.followers?.some(id => id.toString() === req.user._id.toString());
+  }
+  userData.isFollowing = isFollowing;
+
+  return success(res, { user: userData });
 });
 
 /**
@@ -210,7 +223,59 @@ const updateUserRole = asyncHandler(async (req, res) => {
   return success(res, { user });
 });
 
+/**
+ * @desc    Follow a user
+ * @route   POST /api/users/:username/follow
+ * @access  Private
+ */
+const followUser = asyncHandler(async (req, res) => {
+  const targetUser = await User.findOne({ username: req.params.username });
+  if (!targetUser) return error(res, 'User not found.', 404);
+
+  if (targetUser._id.toString() === req.user._id.toString()) {
+    return error(res, 'You cannot follow yourself.', 400);
+  }
+
+  const isFollowing = targetUser.followers.some(id => id.toString() === req.user._id.toString());
+  if (isFollowing) {
+    return error(res, 'You are already following this user.', 400);
+  }
+
+  await Promise.all([
+    User.findByIdAndUpdate(targetUser._id, { $addToSet: { followers: req.user._id } }),
+    User.findByIdAndUpdate(req.user._id, { $addToSet: { following: targetUser._id } })
+  ]);
+
+  return success(res, { message: `You are now following ${targetUser.username}.` });
+});
+
+/**
+ * @desc    Unfollow a user
+ * @route   DELETE /api/users/:username/follow
+ * @access  Private
+ */
+const unfollowUser = asyncHandler(async (req, res) => {
+  const targetUser = await User.findOne({ username: req.params.username });
+  if (!targetUser) return error(res, 'User not found.', 404);
+
+  if (targetUser._id.toString() === req.user._id.toString()) {
+    return error(res, 'You cannot unfollow yourself.', 400);
+  }
+
+  const isFollowing = targetUser.followers.some(id => id.toString() === req.user._id.toString());
+  if (!isFollowing) {
+    return error(res, 'You are not following this user.', 400);
+  }
+
+  await Promise.all([
+    User.findByIdAndUpdate(targetUser._id, { $pull: { followers: req.user._id } }),
+    User.findByIdAndUpdate(req.user._id, { $pull: { following: targetUser._id } })
+  ]);
+
+  return success(res, { message: `You have unfollowed ${targetUser.username}.` });
+});
+
 module.exports = {
   getUser, updateMe, updatePassword, getUserPosts, getUserComments,
-  getAllUsers, deleteUser, banUser, updateUserRole,
+  getAllUsers, deleteUser, banUser, updateUserRole, followUser, unfollowUser
 };

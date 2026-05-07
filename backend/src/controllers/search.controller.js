@@ -3,6 +3,7 @@ const User = require('../models/User');
 const Hub = require('../models/Hub');
 const { success } = require('../utils/apiResponse');
 const asyncHandler = require('../utils/asyncHandler');
+const escapeRegex = require('../utils/escapeRegex');
 
 /**
  * @desc    Global search across Hubs, Posts, and Users
@@ -17,34 +18,36 @@ const globalSearch = asyncHandler(async (req, res) => {
     return success(res, { hubs: [], posts: [], users: [] });
   }
 
-  const searchFilter = { $text: { $search: q } };
-  const projection = { score: { $meta: 'textScore' } };
-  const sort = { score: { $meta: 'textScore' } };
+  const regex = new RegExp(escapeRegex(q), 'i');
+
+  const hubFilter  = { name: regex };
+  const postFilter  = { title: regex };
+  const userFilter  = { username: regex };
 
   const results = {};
 
   if (type === 'all' || type === 'hubs') {
-    results.hubs = await Hub.find(searchFilter, projection)
-      .sort(sort)
+    results.hubs = await Hub.find(hubFilter)
+      .sort({ memberCount: -1 })
       .skip(skip)
       .limit(Number(limit))
       .lean();
   }
 
   if (type === 'all' || type === 'posts') {
-    results.posts = await Post.find(searchFilter, projection)
+    results.posts = await Post.find(postFilter)
       .populate('author', 'username avatar')
       .populate('hub', 'name slug icon')
-      .sort(sort)
+      .sort({ createdAt: -1 })
       .skip(skip)
       .limit(Number(limit))
       .lean();
   }
 
   if (type === 'all' || type === 'users') {
-    results.users = await User.find(searchFilter, projection)
+    results.users = await User.find(userFilter)
       .select('username avatar bio')
-      .sort(sort)
+      .sort({ createdAt: -1 })
       .skip(skip)
       .limit(Number(limit))
       .lean();

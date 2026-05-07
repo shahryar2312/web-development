@@ -2,8 +2,8 @@ const express = require('express');
 const { body } = require('express-validator');
 const router = express.Router();
 
-const { getUser, updateMe, updatePassword, getUserPosts, getUserComments, getAllUsers, deleteUser, banUser, updateUserRole } = require('../controllers/user.controller');
-const { protect, adminOnly } = require('../middleware/auth');
+const { getUser, updateMe, updatePassword, getUserPosts, getUserComments, getAllUsers, deleteUser, banUser, updateUserRole, followUser, unfollowUser } = require('../controllers/user.controller');
+const { protect, adminOnly, optionalAuth } = require('../middleware/auth');
 const { param } = require('express-validator');
 const validateRequest = require('../middleware/validateRequest');
 const upload = require('../middleware/uploadUtility');
@@ -38,8 +38,10 @@ router.put('/me',          protect, upload.single('avatar'), updateMeRules, vali
 // 01.05 Ilia Klodin: dedicated avatar route so multipart upload doesnt go through the full updateMe validation, otherwise couldn't just update the avatar without also sending all the other fields fopr some reason
 router.put('/me/avatar',   protect, upload.single('avatar'), updateMe);
 router.put('/me/password', protect, updatePasswordRules, validateRequest, updatePassword);
-router.get('/:username',             getUser);
-router.get('/:username/posts',       getUserPosts);
-router.get('/:username/comments',    getUserComments);
+router.get('/:username',             optionalAuth, getUser);
+router.post('/:username/follow',     protect, followUser);
+router.delete('/:username/follow',   protect, unfollowUser);
+router.get('/:username/posts',       optionalAuth, getUserPosts);
+router.get('/:username/comments',    optionalAuth, getUserComments);
 
 module.exports = router;

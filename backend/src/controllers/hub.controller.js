@@ -2,8 +2,8 @@ const Hub = require('../models/Hub');
 const User = require('../models/User');
 const { success, error } = require('../utils/apiResponse');
 const asyncHandler = require('../utils/asyncHandler');
-
-const PAGE_SIZE = 20;
+const escapeRegex = require('../utils/escapeRegex');
+const { PAGE_SIZE } = require('../utils/constants');
 
 /**
  * @desc    List all hubs with search (name/game) and sort order
@@ -15,8 +15,11 @@ const getHubs = asyncHandler(async (req, res) => {
 
   const filter = {};
   if (search) {
-    // Using the text index added in models/Hub.js
-    filter.$text = { $search: search };
+    const regex = new RegExp(escapeRegex(search), 'i');
+    filter.$or = [
+      { name: regex },
+      { game: regex },
+    ];
   }
 
   const sortMap = {
@@ -28,7 +31,7 @@ const getHubs = asyncHandler(async (req, res) => {
   const [hubs, total] = await Promise.all([
     Hub.find(filter)
       .populate('creator', 'username avatar')
-      .sort(search ? { score: { $meta: 'textScore' } } : (sortMap[sort] || sortMap.popular))
+      .sort(sortMap[sort] || sortMap.popular)
       .skip((page - 1) * PAGE_SIZE)
       .limit(PAGE_SIZE)
       .lean(),
