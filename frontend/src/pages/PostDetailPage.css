@@ -165,6 +165,25 @@
   gap: var(--space-2);
 }
 
+.comment__reply-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  font-size: var(--fs-sm);
+  padding: 2px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: color var(--transition), background var(--transition);
+}
+
+.comment__reply-btn:hover {
+  color: var(--color-primary);
+  background: rgba(124, 58, 237, 0.08);
+}
+
 .comment__score {
   font-size: var(--fs-sm);
   font-weight: 700;
