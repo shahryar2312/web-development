@@ -3,6 +3,8 @@
 // - Automatically unwraps the { success: true, data: {...} } response envelope
 // - Throws an Error with .message and .status for non-2xx responses
 
+const BASE = import.meta.env.VITE_API_URL || '';
+
 async function apiFetch(path, options = {}) {
   const isFormData = options.body instanceof FormData;
 
@@ -10,7 +12,7 @@ async function apiFetch(path, options = {}) {
     ? { ...options.headers }
     : { 'Content-Type': 'application/json', ...options.headers };
 
-  const res = await fetch(path, {
+  const res = await fetch(BASE + path, {
     ...options,
     credentials: 'include',
     headers,
