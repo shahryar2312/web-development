@@ -20,6 +20,10 @@ const { generalLimiter } = require('./src/middleware/rateLimiter');
 
 const app = express();
 
+// Trust Render's (and any other) reverse proxy so req.ip is the real client IP.
+// Without this, express-rate-limit sees all traffic as coming from the same proxy IP.
+app.set('trust proxy', 1);
+
 // Connect to MongoDB
 connectDB();
 
@@ -61,10 +65,8 @@ app.use(
   })
 );
 
-// HTTP request logger (dev only)
-if (process.env.NODE_ENV === 'development') {
-  app.use(morgan('dev'));
-}
+// HTTP request logger
+app.use(morgan('dev'));
 
 // Broad rate limit on all API routes
 app.use('/api', generalLimiter);
