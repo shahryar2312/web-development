@@ -3,7 +3,7 @@
 // - Automatically unwraps the { success: true, data: {...} } response envelope
 // - Throws an Error with .message and .status for non-2xx responses
 
-const BASE = import.meta.env.VITE_API_URL || '';
+const BASE = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
 
 async function apiFetch(path, options = {}) {
   const isFormData = options.body instanceof FormData;
